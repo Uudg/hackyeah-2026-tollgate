@@ -3,7 +3,16 @@ import { z } from "zod";
 import { globMatch } from "@tollgate/controls";
 import { sha256, type LoadResult, zodIssues } from "@tollgate/policy/loader";
 
-const Price = z.strictObject({ input_per_1k: z.number().nonnegative(), output_per_1k: z.number().nonnegative(), local: z.boolean().optional() });
+const Price = z.strictObject({
+  input_per_1k: z.number().nonnegative(),
+  output_per_1k: z.number().nonnegative(),
+  local: z.boolean().optional(),
+  /** A made-up commercial price for a demo alias: spend and USD budgets are real, no money is spent. */
+  shadow: z.boolean().optional(),
+  /** Alias: the model actually sent upstream (records, budgets and spend keep the alias name). */
+  upstream_model: z.string().min(1).optional(),
+  note: z.string().optional(),
+});
 export const PricingSchema = z.strictObject({
   currency: z.literal("USD"),
   models: z.record(z.string(), Price),

@@ -94,7 +94,7 @@ packages/policy     zod schemas + loader for policy.yaml, feed entries, decision
 packages/controls   pure control functions, one file per control, no I/O
 tests/cases/*.yaml  fixtures, grouped by control; tests/redteam/seeds for the fuzzer; tests/cases/generated for found bypasses
 policy.yaml         the control catalog; policy.strict.yaml and policy.monitor.yaml are the other two presets
-pricing.json        per-model prices (hot-reloaded)
+pricing.json        per-model prices (hot-reloaded); local models at $0, plus one labelled shadow price (demo-paid-model) for the USD-budget demo
 feeds/ai-exploits.json  the signature feed
 ```
 

@@ -40,6 +40,12 @@ agents:
     models: ["llama3.2:3b"]
     description: "Prepares payment instructions for the treasury team. Must never reveal account data or send funds without approval."
     memory_namespace: finance
+  paid-demo:                             # paid-API budget demo (docs/DEMO.md); shadow-priced alias, tiny USD budget
+    key: tg_paid-demo_Pd4sH8wV2nB6mQ9xK3cL
+    scopes: [chat]
+    models: ["demo-paid-model"]
+    description: "Demo identity for USD budgets: spends shadow dollars on demo-paid-model."
+
   test-small-budget:
     key: tg_test-small-budget_Hj2kL5mN8pQ1rS4tV7wX
     scopes: [chat]
@@ -50,7 +56,7 @@ agents:
     description: "Internal fuzzer identity."
 
 models:
-  allow: ["llama3.2:3b", "llama-guard3:1b", "granite3-guardian:2b"]
+  allow: ["llama3.2:3b", "llama-guard3:1b", "granite3-guardian:2b", "demo-paid-model"]
   deny_registries: ["*"]
 
 controls:
@@ -149,6 +155,8 @@ budgets:
       usd_per_day: 0.10
       max_tool_depth: 2
       requests_per_minute: 10
+    paid-demo:
+      usd_per_day: 0.02
     test-small-budget:
       tokens_per_hour: 3000
       usd_per_day: 0.01

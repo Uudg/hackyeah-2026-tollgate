@@ -23,7 +23,7 @@
 #   cp policy.strict.yaml policy.yaml   ← this is the "change strictness" demo
 # =============================================================================
 
-version: 14            # human-readable counter; bump it when you change something.
+version: 15            # human-readable counter; bump it when you change something.
                        # The gateway identifies policies by content hash, so forgetting
                        # to bump it is harmless — the hash still changes.
 
@@ -68,6 +68,12 @@ agents:
     description: "Prepares payment instructions for the treasury team. Must never reveal account data or send funds without approval."
     memory_namespace: finance
 
+  paid-demo:                             # the paid-API budget demo (docs/DEMO.md): one shadow-priced model, tiny USD budget
+    key: tg_paid-demo_Pd4sH8wV2nB6mQ9xK3cL
+    scopes: [chat]
+    models: ["demo-paid-model"]          # alias in pricing.json → llama3.2:3b upstream, priced like a commercial API
+    description: "Demo identity for USD budgets: spends shadow dollars on demo-paid-model."
+
   test-small-budget:                     # used by tests/cases/budgets.yaml; budget is tiny (see budgets.agents)
     key: tg_test-small-budget_Hj2kL5mN8pQ1rS4tV7wX
     scopes: [chat]
@@ -90,6 +96,7 @@ models:
     - "qwen2.5:*"
     - "llama-guard3:1b"                  # tier-1 classifier (the gateway calls it itself)
     - "granite3-guardian:2b"             # optional jailbreak vote
+    - "demo-paid-model"                  # shadow-priced alias of llama3.2:3b (pricing.json), only for agent paid-demo
   deny_registries: ["*"]                 # a model name with a registry prefix (host/ns/name) is
                                          # never allowed: pulls from untrusted registries were the
                                          # Probllama (CVE-2024-37032) vector. "*" = every host.
@@ -232,6 +239,8 @@ budgets:
       usd_per_day: 0.50
       max_tool_depth: 4
       requests_per_minute: 30
+    paid-demo:                           # a few demo-paid-model requests, then 429 budget.usd_per_day (docs/DEMO.md)
+      usd_per_day: 0.02
     test-small-budget:                   # tests/cases/budgets.yaml exhausts this in a handful of requests
       tokens_per_hour: 3000
       usd_per_day: 0.01

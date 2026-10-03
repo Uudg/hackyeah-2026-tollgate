@@ -228,7 +228,8 @@ export async function runChat(ctx: Ctx, req: ChatRequestIn): Promise<ChatRespons
 
   // Stage 6: upstream.
   const tu = performance.now();
-  const upstreamBody = { ...body, messages: forwardMessages, stream: false } as typeof body;
+  // A pricing.json alias (e.g. the shadow-priced demo-paid-model) is served by its upstream_model.
+  const upstreamBody = { ...body, model: pricing.price.upstream_model ?? body.model, messages: forwardMessages, stream: false } as typeof body;
   if (forwardTools && forwardTools.length > 0) upstreamBody.tools = forwardTools; else delete upstreamBody.tools;
   const result = await ctx.upstream.chat(upstreamBody, {
     policy, agentId, echo: ctx.upstream.name === "echo" ? (req.header("x-tollgate-echo") ?? null) : null, signal: AbortSignal.timeout(policy.upstream.timeout_ms),

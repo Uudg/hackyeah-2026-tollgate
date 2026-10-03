@@ -115,7 +115,27 @@ Judges see: five `200 -` lines then `429 budget.loop_breaker` (policy: `loop_bre
 
 Say: "A stuck agent retrying the same call is the most common way to burn a budget. The loop breaker catches the pattern; the hourly token cap, daily USD cap, compute-seconds cap and max tool depth catch the rest. The `test-small-budget` agent in the policy hits its token cap on the third request — that is one of the fixtures."
 
-Optional if a judge asks about cost on paid APIs: open `pricing.json`, show a per-model price, say the USD cap is computed from it per request, pre-checked on the estimate and reconciled on the real `usage`.
+Optional if a judge asks about cost on paid APIs: run the paid-API budget demo below (40 s).
+
+#### Paid-API budget without paying (optional, 40 s)
+
+No paid API is ever called. `pricing.json` has one clearly labelled **shadow price**: the alias `demo-paid-model` is served by the local `llama3.2:3b` (`"upstream_model": "llama3.2:3b"`, `"shadow": true`) but priced like a commercial API ($0.0025 / 1k input, $0.01 / 1k output, gpt-4o list price). `llama3.2:3b` itself stays at $0. The agent `paid-demo` (key `tg_paid-demo_Pd4sH8wV2nB6mQ9xK3cL`) may only use that alias and has `budgets.agents.paid-demo.usd_per_day: 0.02`.
+
+```sh
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -s -o /dev/null -w "%{http_code} %header{x-tollgate-rule}\n" localhost:8787/v1/chat/completions \
+    -H 'Authorization: Bearer tg_paid-demo_Pd4sH8wV2nB6mQ9xK3cL' -H 'content-type: application/json' \
+    -d "{\"model\":\"demo-paid-model\",\"max_tokens\":1800,\"messages\":[{\"role\":\"user\",\"content\":\"Request $i: summarise the Q3 treasury notes in three bullets.\"}]}"
+done
+```
+
+Judges see: a few `200 -` lines, then `429 budget.usd_per_day`. Tab B → Overview: "Spend by agent, today" shows `paid-demo` with real dollars (measured with `UPSTREAM=echo`: 7 × 200, then 429, spend $0.002; with Ollama the replies are longer, so it trips after 2–4 requests).
+
+Why it trips before $0.02 is spent: the budget pre-check reserves the worst case, `max_tokens` × output price (1800 × $0.01/1k = $0.018), on top of what was already spent, and the real `usage` is reconciled after the reply. A request that could overrun the daily cap is refused before it reaches the model.
+
+Say: "Local models are free, so to show a USD cap we priced an alias like a commercial API. The decision is the same one a paid upstream would get: estimate, pre-check, reconcile, 429 with `Retry-After`."
+
+Reset for a second run: the window is per day; `DELETE` nothing by hand, just restart with a fresh `TOLLGATE_DATA_DIR` or raise `usd_per_day` in `policy.yaml` (hot-reloaded).
 
 ### 3:40 — Reporting and close (20 s)
 

@@ -77,7 +77,7 @@ Fixed values — do not change without updating HANDOFF.md, SPEC.md and README:
 | SQLite | `./data/tollgate.db` |
 | Agent auth | `Authorization: Bearer tg_<agent>_<random>`; keys map to agent id + scopes in `policy.agents` |
 | Admin auth | `Authorization: Bearer <ADMIN_TOKEN>` or `?token=` on `/admin/*` |
-| Agents in policy.yaml | `demo-agent`, `research-bot`, `finance-agent`, `test-small-budget`, `redteam` (keys in the file) |
+| Agents in policy.yaml | `demo-agent`, `research-bot`, `finance-agent`, `paid-demo`, `test-small-budget`, `redteam` (keys in the file) |
 
 ## Commands
 

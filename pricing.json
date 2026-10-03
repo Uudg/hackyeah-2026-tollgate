@@ -8,7 +8,11 @@
     "granite3-guardian:*": { "input_per_1k": 0, "output_per_1k": 0, "local": true },
     "gpt-4o": { "input_per_1k": 0.0025, "output_per_1k": 0.01 },
     "gpt-4o-mini": { "input_per_1k": 0.00015, "output_per_1k": 0.0006 },
-    "claude-sonnet-4-5": { "input_per_1k": 0.003, "output_per_1k": 0.015 }
+    "claude-sonnet-4-5": { "input_per_1k": 0.003, "output_per_1k": 0.015 },
+    "demo-paid-model": {
+      "input_per_1k": 0.0025, "output_per_1k": 0.01, "shadow": true, "upstream_model": "llama3.2:3b",
+      "note": "SHADOW PRICE for the paid-API budget demo (docs/DEMO.md). Served by local llama3.2:3b, no money is spent; priced like a commercial API (gpt-4o list price) so USD spend and budget.usd_per_day can be shown. llama3.2:3b itself stays at 0 USD."
+    }
   },
   "default": { "input_per_1k": 0.001, "output_per_1k": 0.002 }
 }

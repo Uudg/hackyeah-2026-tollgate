@@ -144,3 +144,24 @@
     models.allow: ["llama3.2:3b", "gpt-4o-mini"]
     budgets.agents.test-small-budget.usd_per_day: 0.0001
   expect: { status: 200 }              # over budget, but monitor mode only records it
+
+# --- Paid-API budget without paying: demo-paid-model is a shadow-priced alias of llama3.2:3b (pricing.json). ---
+- id: budget-shadow-price-allow
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: paid-demo
+  model: demo-paid-model
+  input: "Summarise the Q3 treasury notes in three bullet points."
+  expect: { decision: allow, status: 200 }
+
+- id: budget-shadow-price-usd-block
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: paid-demo
+  model: demo-paid-model
+  policy:
+    budgets.agents.paid-demo.usd_per_day: 0.005   # the pre-check reserves 1024 tokens x $0.01/1k = $0.0103
+  input: "Summarise the Q3 treasury notes in three bullet points."
+  expect: { decision: block, rule: budget.usd_per_day, status: 429 }
