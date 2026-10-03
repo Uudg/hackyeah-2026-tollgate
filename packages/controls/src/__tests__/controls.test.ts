@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   applyRedactions, checkToolCall, checkToolDefinitions, declaredTools, decodeVariants, extractUrls, generateCanary, globMatch,
   ibanValid, luhnValid, normalize, peselValid, scanCanaries, scanInjection, scanLinks, scanPii, scanSecrets, scanSysprompt,
-  shannon, walkPickle, compareVersions, versionInRange,
+  shannon, walkPickle, compareVersions, versionInRange, remaskExcerpts,
 } from "../index.ts";
 
 const field = "messages[0].content";
@@ -136,5 +136,20 @@ describe("helpers", () => {
     expect(applyRedactions("abcdef", [{ start: 1, end: 3, label: "a" }, { start: 2, end: 5, label: "longer" }])).toBe("a[REDACTED:longer]f");
     expect(compareVersions("0.6.2", "0.1.34")).toBe(1);
     expect(versionInRange("0.1.33", { lt: "0.1.34" })).toBe(true);
+  });
+});
+
+describe("excerpts", () => {
+  test("a neighbouring secret in the context window is masked too", () => {
+    const tokens = [
+      { id: "c1", token: "AKIARPV2NMDJQABMZAAN", kind: "aws_key", label: null },
+      { id: "c2", token: "tgc_2PCTHAU2lBR3ith9fYvAbCdE", kind: "api_key", label: null },
+    ];
+    const text = "Keys in use: AWS_KEY=AKIARPV2NMDJQABMZAAN; SUPPORT_TOKEN=tgc_2PCTHAU2lBR3ith9fYvAbCdE";
+    const hits = remaskExcerpts(text, scanCanaries(text, tokens, { rule: "canaries.in_output", action: "kill_session", field }));
+    for (const h of hits) {
+      expect(h.excerptRedacted).not.toContain("AKIARPV2");
+      expect(h.excerptRedacted).not.toContain("tgc_2PCT");
+    }
   });
 });

@@ -58,6 +58,24 @@ export function globMatch(pattern: string, value: string): boolean {
 }
 
 /**
+ * Rebuild every hit's excerpt with all masked spans of the same field applied, so the 40 characters of
+ * context around one match never carry a neighbouring secret, canary or PII value in clear text.
+ * `text` is the text the spans index into.
+ */
+export function remaskExcerpts(text: string, hits: Hit[]): Hit[] {
+  const spans = hits.flatMap((h) => (h.span && typeof h.details?.mask === "string" ? [{ ...h.span, label: h.details.mask as string }] : []));
+  if (spans.length < 2) return hits;
+  return hits.map((h) => {
+    if (!h.span || typeof h.details?.mask !== "string") return h;
+    const ws = Math.max(0, h.span.start - 40), we = Math.min(text.length, h.span.end + 40);
+    const inWindow = spans.filter((s) => s.field === h.span!.field && s.start < we && s.end > ws)
+      .map((s) => ({ start: Math.max(s.start, ws) - ws, end: Math.min(s.end, we) - ws, label: s.label }));
+    const body = applyRedactions(text.slice(ws, we), inWindow);
+    return { ...h, excerptRedacted: `${ws > 0 ? "…" : ""}${body}${we < text.length ? "…" : ""}`.slice(0, 120) };
+  });
+}
+
+/**
  * Apply redactions. Overlapping spans merge into one, labelled by the longest span.
  * Spans index into `text`.
  */

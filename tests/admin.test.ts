@@ -65,6 +65,10 @@ describe("deterministic · shapes", () => {
     const f = await json("/admin/feed", FeedShape);
     expect(f.entries.length).toBeGreaterThan(10);
   });
+  test("/healthz answers the dashboard origin with CORS headers", async () => {
+    const res = await fetch(`${tg.url}/healthz`, { headers: { origin: "http://localhost:3000" } });
+    expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
+  });
   test("/healthz needs no token", async () => {
     const res = await get("/healthz", false);
     expect(res.status).toBe(200);

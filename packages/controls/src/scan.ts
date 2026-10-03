@@ -1,7 +1,7 @@
 // Per-field scanning used by the gateway's tier 0 and output path. Pure: the caller passes the policy snapshot,
 // the compiled feed and the canary list; nothing here touches the network, disk or a clock.
 import { SEVERITY, type Action, type Hit, type Policy } from "@tollgate/policy";
-import { applyRedactions, excerpt, type CanaryToken } from "./types.ts";
+import { applyRedactions, excerpt, remaskExcerpts, type CanaryToken } from "./types.ts";
 import { normalize, decodeVariants } from "./normalize/index.ts";
 import { scanPii } from "./pii/index.ts";
 import { scanSecrets } from "./secrets/index.ts";
@@ -91,7 +91,7 @@ export function scanRequestField(text: string, role: Role, field: string, env: S
     }
   }
   const unicodeRedact = hits.some((h) => h.controlId === "unicode" && h.action === "redact");
-  return { hits, ...redactField(text, n.text, hits, unicodeRedact), decodeTruncated };
+  return { hits: remaskExcerpts(n.text, hits), ...redactField(text, n.text, hits, unicodeRedact), decodeTruncated };
 }
 
 export interface OutputFieldOptions {
@@ -148,8 +148,8 @@ export function scanOutputField(text: string, field: string, env: ScanEnv, o: Ou
       hits.push({ ...h, span: undefined, details: { ...h.details, scannedAs: "argument_values" } });
     }
   }
-  if (wholeField) return { hits, redacted: JSON.stringify({ redacted: "[REDACTED:tool_arguments]" }), remapped: false, decodeTruncated: false };
-  return { hits, ...redactField(text, t, hits, false), decodeTruncated: false };
+  if (wholeField) return { hits: remaskExcerpts(t, hits), redacted: JSON.stringify({ redacted: "[REDACTED:tool_arguments]" }), remapped: false, decodeTruncated: false };
+  return { hits: remaskExcerpts(t, hits), ...redactField(text, t, hits, false), decodeTruncated: false };
 }
 
 /** Highest-severity hit (first one wins a tie) and the collapsed decision. No hits → allow. */

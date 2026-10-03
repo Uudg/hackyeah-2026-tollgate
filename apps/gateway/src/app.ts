@@ -144,6 +144,9 @@ export function createGateway(opts: GatewayOptions): Gateway {
   const app = new Hono();
   const origins = opts.corsOrigins;
   app.use("/admin/*", cors({ origin: origins, allowHeaders: ["Authorization", "Content-Type", "Last-Event-ID"], exposeHeaders: ["Content-Disposition"] }));
+  // The dashboard probes /healthz from the browser to decide live vs mock; /metrics is readable cross-origin too.
+  app.use("/healthz", cors({ origin: origins }));
+  app.use("/metrics", cors({ origin: origins, allowHeaders: ["Authorization"] }));
   app.use("/v1/*", cors({ origin: origins, exposeHeaders: ["X-Tollgate-Decision", "X-Tollgate-Rule", "X-Tollgate-Tier", "X-Tollgate-Policy", "X-Tollgate-Event", "X-Tollgate-Latency"] }));
   app.route("/", chatRoutes(ctx));
   app.route("/admin", adminRoutes(ctx, opts.policyPath));
