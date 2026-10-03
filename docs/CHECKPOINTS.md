@@ -122,3 +122,38 @@ The dashboard (Track B, Sonnet) is built: 9 routes, mock + live modes. The gatew
 2. M7 Red Team Loop next (replaces the `/admin/redteam/*` stubs). It is the strongest proof for "robustness" and "test-suite completeness".
 3. M8 canaries are done inside M2–M4 (scan, kill, session block, demo row). Only the dashboard canary panel is left.
 4. Then the hardening pass, README and slides. Nothing needs cutting at this pace.
+
+## Checkpoint 3 — after M7 (Sat 3 Oct, 23:59 CEST)
+
+### Done
+- Red Team Loop (SPEC §12): `apps/gateway/src/redteam/{mutators,runner,cli}.ts`; 13 deterministic mutators + translate/paraphrase behind `include_model_mutators`; depth-1/2 chains; in-process runs through `runChat` (same pipeline as live traffic); SQLite `redteam_runs` / `redteam_results`; `redteam.progress|bypass|done` events; one generated case file per run.
+- `/admin/redteam/{run,status,runs,abort}` replace the stubs (202 / 409 / 400). Coverage `bypassRate` per control, `tollgate_redteam_bypass_rate{control}` gauge, posture resilience term from the latest run.
+- `bun run redteam` CLI: flags from SPEC §12 plus `--rng-seed`; prints the control table.
+- `tests/redteam.test.ts` (6 tests): determinism, chain rules, seed corpus validation, a full run with attempts/bypasses/generated-case parsing/coverage/metrics, one-run-at-a-time + abort + bad config.
+- Dashboard: red-team page checked live at 1440 and 390 px; a finished run's progress no longer reads "142 of 500".
+
+### Measured (depth 1, 88 seeds, rng_seed 1, semantic tiers on, ~5 min/run)
+Before hardening: 1180 attempts, 268 bypasses (22.7 %). After: 185 bypasses (15.7 %). Per control in README "Red Team Loop".
+
+### Findings fixed (SPEC §16 D17–D20)
+1. leetspeak beat tier 0 → `leet` decode variant.
+2. payload_split beat tier 0 → `concat` decode variant.
+3. multi_turn split payloads → joined-user-turn scan (injection + signatures).
+4. url_encode blinded Llama Guard → tiers 1–2 also get decoded variants.
+5. Soft prompt-extraction phrasings → feed `generic-prompt-leak-phrases` widened; `generic-pickle-text-global` case-insensitive.
+
+### Harness bugs found by the first real run (D16)
+- redteam agent hit `budget.compute_seconds_per_hour` (202 skips) → its own budget raised in all four policy files.
+- Response seeds reused one benign prompt → loop breaker; now the prompt names the attempt.
+- sysprompt response seeds had no system prompt / one under the 20-word minimum → seed + fixed tail.
+- Encoded output links counted as bypasses although they never render → response seeds skip encoding chains.
+- YAML anchors in generated files tripped the loader's alias limit → written without aliases.
+
+### Open (committed as skipped cases, `tests/cases/generated/*-open.yaml`)
+183 cases: 115 paraphrase-level (classifier/judge miss), 43 request-side tool intent (response path still checks the call), 20 output-side fragments/obfuscation, 5 values split across user turns. Not run: depth 2 (~13k attempts, ~1 h with the model tiers on).
+
+### Tests
+`bun run check` green. `bun test`: 283 pass, 184 skip (183 open red-team cases + granite3-guardian absent), 0 fail.
+
+### Next
+Hardening pass on the open list where a deterministic fix is cheap (output-side case folding for PII/secrets, joined-turn PII); README screenshots, architecture.png, LICENSE, slides.

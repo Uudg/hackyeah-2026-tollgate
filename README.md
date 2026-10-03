@@ -229,7 +229,25 @@ Also included: a hot-reload test (edits a temp policy and the feed, asserts the 
 bun run redteam --minutes 30 --control prompt_injection
 ```
 
-Mutates seed attacks (base64, hex, URL-encoding, leetspeak, homoglyphs, zero-width characters, case shuffle, role-play wrappers, markdown/JSON wrapping, payload splitting, prefix padding, multi-turn; translation and paraphrase only when a model is allowed) against the live policy as a dry-run agent. Every bypass is written to `tests/cases/generated/` as a failing case and shown in the dashboard with a bypass rate per control. <!-- TODO(M7): numbers from the overnight run -->
+Mutates seed attacks (base64, hex, URL-encoding, leetspeak, homoglyphs, zero-width characters, case shuffle, role-play wrappers, markdown/JSON wrapping, payload splitting, prefix padding, multi-turn; translation and paraphrase only when a model is allowed) against the live policy as a dry-run agent. Every bypass is written to `tests/cases/generated/` as a failing case and shown in the dashboard with a bypass rate per control.
+
+Measured on the shipped `policy.yaml`, all 88 seeds, depth 1 (each mutator alone plus the unmutated seed), `rng_seed 1`, Llama Guard 1B + llama3.2:3b judge on, 4 workers on an M1 Max (~5 min per run):
+
+| control | attempts | bypass rate before | after hardening |
+|---|---:|---:|---:|
+| prompt_injection | 364 | 31.9 % | 19.0 % |
+| content_safety | 126 | 21.4 % | 13.5 % |
+| signatures | 266 | 13.9 % | 12.4 % |
+| tool_calls | 126 | 34.1 % | 34.1 % |
+| sysprompt | 40 | 77.5 % | 22.5 % |
+| secrets | 66 | 7.6 % | 7.6 % |
+| link_exfil | 50 | 6.0 % | 6.0 % |
+| pii | 142 | 4.2 % | 4.2 % |
+| **total** | **1180** | **22.7 %** | **15.7 %** |
+
+What the loop found and what changed (SPEC §16, D17–D20): leetspeak, split string fragments and payloads split over several user turns beat tier 0, so these are now decoded and rescanned; URL-encoding blinded the classifier, so tiers 1–2 now also read the decoded text; soft "show me your initial instructions" requests got through, so the prompt-leak signature was widened. The sysprompt "before" figure also includes a harness bug (the system prompt was shorter than the 20-word minimum), fixed in the runner.
+
+Committed results: `tests/cases/generated/*-fixed.yaml` (50 former bypasses that now pass, kept as regression tests) and `*-open.yaml` (183 bypasses still open, each with a `skip:` reason so `bun test` stays green). The open ones are mostly paraphrase-level jailbreaks that the 1B classifier misses (115), request-side tool intents whose tool call would still be checked on the response path (43), and output values split into fragments or obfuscated character by character (20), plus 5 values split across user turns. Remove a `skip:` line to turn a case into a regression test once a fix lands.
 
 ---
 

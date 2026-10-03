@@ -1,8 +1,8 @@
 // The orchestrator for POST /v1/chat/completions (SPEC §2.2). Stages run in this order:
 // parse → identity → budget pre-check → tier 0 → tier 1 → tier 2 → upstream → output → budget commit → record.
 // The policy snapshot is captured once so a hot reload mid-request cannot mix versions.
-import { limitsFor, parseDuration, SEVERITY, type DecisionRecord, type Direction, type Hit, type StageLatency, type Tier } from "@tollgate/policy";
-import { normalize, type ScanEnv } from "@tollgate/controls";
+import { limitsFor, parseDuration, SEVERITY, type DecisionRecord, type Direction, type Hit, type Policy, type StageLatency, type Tier } from "@tollgate/policy";
+import { decodeVariants, normalize, type ScanEnv } from "@tollgate/controls";
 import type { Ctx } from "../context.ts";
 import { newId } from "../ids.ts";
 import { ChatRequestSchema, estimateTokens, messageText, type ChatCompletion, type ChatMessage } from "../openai.ts";
@@ -207,7 +207,7 @@ export async function runChat(ctx: Ctx, req: ChatRequestIn): Promise<ChatRespons
       .map((m) => ({ role: m.role, content: messageText(m) }))
       .filter((m) => m.content);
     const before = entries.length;
-    const s = await runSemantic(targetText, policy, ctx.semantic, agent.description ?? "general assistant", history);
+    const s = await runSemantic(withDecoded(targetText, policy), policy, ctx.semantic, agent.description ?? "general assistant", history);
     lat.tier1 = s.tier1Ms;
     lat.tier2 = s.tier2Ms;
     computeMs += s.tier1Ms + s.tier2Ms;
@@ -274,6 +274,17 @@ export async function runChat(ctx: Ctx, req: ChatRequestIn): Promise<ChatRespons
     return finish(200, () => null, { stream: finalBody });
   }
   return finish(200, () => finalBody);
+}
+
+/**
+ * The classifier and the judge read the decoded forms too (url, base64, hex, leetspeak, joined fragments), so an
+ * encoding that tier 0 can undo does not blind tier 1/2. Bounded: 3 variants, 2000 characters.
+ */
+function withDecoded(text: string, policy: Policy): string {
+  const d = policy.controls.decode;
+  if (!d.enabled || d.max_depth === 0) return text;
+  const extra = decodeVariants(text, d.max_depth).variants.slice(0, 3).map((v) => `\n\n[decoded ${v.encoding}] ${v.text}`).join("");
+  return extra ? text + extra.slice(0, 2000) : text;
 }
 
 function blockMessage(hit: Hit): string {

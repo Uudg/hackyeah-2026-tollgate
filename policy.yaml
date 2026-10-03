@@ -23,7 +23,7 @@
 #   cp policy.strict.yaml policy.yaml   ← this is the "change strictness" demo
 # =============================================================================
 
-version: 13            # human-readable counter; bump it when you change something.
+version: 14            # human-readable counter; bump it when you change something.
                        # The gateway identifies policies by content hash, so forgetting
                        # to bump it is harmless — the hash still changes.
 
@@ -241,6 +241,7 @@ budgets:
     redteam:
       tokens_per_hour: 5000000           # dry runs never reach the upstream, but tokens are still estimated
       requests_per_minute: 2000
+      compute_seconds_per_hour: 36000    # tier 1 + tier 2 time on every attempt; a full depth-2 run needs hours of model time
   loop_breaker:                          # the same request (agent + model + normalized last user message + tools)
     enabled: true                        # repeated too often = a stuck agent
     same_request_within: 30s

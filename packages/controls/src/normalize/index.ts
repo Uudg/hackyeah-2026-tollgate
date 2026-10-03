@@ -4,7 +4,7 @@ import { foldHomoglyphs } from "./homoglyphs.ts";
 
 export { stripInvisible, hasInvisible, INVISIBLE } from "./invisible.ts";
 export { foldHomoglyphs } from "./homoglyphs.ts";
-export { decodeVariants, base64Text, base64Bytes, isPickleHeader, isPrintable } from "./decode.ts";
+export { decodeVariants, base64Text, base64Bytes, isPickleHeader, isPrintable, foldLeet, joinFragments } from "./decode.ts";
 export type { DecodedVariant, PickleBlob, DecodeResult } from "./decode.ts";
 
 export interface Normalized { text: string; invisible: number; homoglyphs: number }

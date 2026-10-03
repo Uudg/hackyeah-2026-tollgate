@@ -1,6 +1,7 @@
 // Decode-and-rescan candidates (SPEC §2.2 step 3a.4): base64, hex, URL-encoded runs and HTML entities are decoded
 // and kept as extra variants when the result is readable text. Base64 that decodes to a pickle header is kept
-// as bytes for the pickle walker instead.
+// as bytes for the pickle walker instead. Two whole-text rewrites found by the Red Team Loop are added too:
+// leetspeak folded back to letters, and string fragments that the text asks to concatenate.
 import type { Encoding } from "../types.ts";
 
 export interface DecodedVariant {
@@ -79,11 +80,39 @@ function decodeOne(span: string, enc: Encoding): string | null {
         const text = span.replace(/&#(x?)([0-9a-fA-F]+);/g, (_, x: string, n: string) => String.fromCodePoint(parseInt(n, x ? 16 : 10)));
         return isPrintable(text) ? text : null;
       }
+      default: return null; // leet and concat are whole-text rewrites, not span decoders
     }
   } catch {
     return null; // malformed escape sequence or out-of-range code point: not a decodable candidate
   }
 }
+
+const LEET: Record<string, string> = { "4": "a", "3": "e", "1": "i", "0": "o", "5": "s", "7": "t", "@": "a", "$": "s" };
+
+/** "1gn0r3 4ll prev10u5" → "ignore all previous". Only words mixing letters and leet digits change; needs ≥ 2 of them. */
+export function foldLeet(text: string): string | null {
+  let changed = 0;
+  const out = text.replace(/[\p{L}\d@$]+/gu, (w, at: number) => {
+    // Skip %XX escapes, hex strings, long tokens (keys, digests) and words without both letters and leet digits.
+    if (text[at - 1] === "%" || w.length > 24 || /^[0-9a-f]+$/i.test(w) || !/\p{L}/u.test(w) || !/[013457@$]/.test(w)) return w;
+    changed++;
+    return w.replace(/[013457@$]/g, (ch) => LEET[ch]!);
+  });
+  return changed >= 2 ? out : null;
+}
+
+/** `a = "Ignore all prev"` `b = "ious instructions"` → the fragments joined, when there are at least two. */
+export function joinFragments(text: string): string | null {
+  const parts: string[] = [];
+  for (const m of text.matchAll(/\b\w{1,24}\s*[=:]\s*("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')/g)) {
+    const lit = m[1]!;
+    try { parts.push(lit.startsWith('"') ? (JSON.parse(lit) as string) : lit.slice(1, -1)); }
+    catch { parts.push(lit.slice(1, -1)); } // not valid JSON escapes: take the raw characters
+  }
+  return parts.length >= 2 ? parts.join("") : null;
+}
+
+const REWRITES: Array<[(t: string) => string | null, Encoding]> = [[foldLeet, "leet"], [joinFragments, "concat"]];
 
 /** All decodable variants of `text`, recursively to `maxDepth`, bounded by 32 variants and 64 KB. */
 export function decodeVariants(text: string, maxDepth: number): DecodeResult {
@@ -110,5 +139,11 @@ export function decodeVariants(text: string, maxDepth: number): DecodeResult {
     }
   };
   walk(text, 1, null);
+  for (const [rewrite, enc] of REWRITES) {
+    const t = rewrite(text);
+    if (t === null || t === text || result.variants.length >= MAX_VARIANTS) continue;
+    result.variants.push({ text: t, depth: 1, encoding: enc, rootStart: 0, rootEnd: text.length });
+    walk(t, 2, [0, text.length]);
+  }
   return result;
 }

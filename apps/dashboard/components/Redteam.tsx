@@ -52,7 +52,8 @@ export default function Redteam() {
   const running = run?.status === "running";
   const attempts = live && run && live.runId === run.id ? live.attempts : run?.attempts ?? 0;
   const bypasses = live && run && live.runId === run.id ? live.bypasses : run?.bypasses ?? 0;
-  const max = run?.config?.max_attempts ?? maxAttempts;
+  // max_attempts is a cap: a finished run that used fewer attempts is still complete.
+  const max = running ? run?.config?.max_attempts ?? maxAttempts : Math.max(1, attempts);
   const caseFiles = useMemo(() => {
     const fromResults = (status.data?.recent ?? []).map((r) => r.generatedCasePath).filter((p): p is string => !!p);
     return [...new Set([...cases, ...fromResults])];
@@ -138,7 +139,7 @@ export default function Redteam() {
                   <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, (attempts / Math.max(1, max)) * 100)}%` }} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-[12px]">
-                  <span><b>{attempts}</b> <span className="text-mute">of {max} attempts</span></span>
+                  <span><b>{attempts}</b> <span className="text-mute">{running ? `of up to ${max} attempts` : "attempts"}</span></span>
                   <span><b>{bypasses}</b> <span className="text-mute">bypasses</span></span>
                   <span><b>{fmtPct(attempts ? bypasses / attempts : null, 1)}</b> <span className="text-mute">bypass rate</span></span>
                   {running && live?.current && <span className="mono truncate text-mute">{live.current}</span>}

@@ -11,6 +11,7 @@ import { metricsSummary } from "../../telemetry/summary.ts";
 import { verifyFile } from "../../audit/verify.ts";
 import type { AuditLine } from "../../audit/chain.ts";
 import { sseRoute } from "./events.ts";
+import { RedteamConfigSchema, type RedteamRunner } from "../../redteam/runner.ts";
 import { z } from "zod";
 
 const tokenOk = (given: string | undefined, want: string) => {
@@ -19,7 +20,7 @@ const tokenOk = (given: string | undefined, want: string) => {
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
-export function adminRoutes(ctx: Ctx, policyPath: string) {
+export function adminRoutes(ctx: Ctx, policyPath: string, redteam: RedteamRunner) {
   const app = new Hono();
 
   app.use("*", async (c, next) => {
@@ -148,7 +149,7 @@ export function adminRoutes(ctx: Ctx, policyPath: string) {
       const key = r.policyKey?.split(".")[1] as keyof typeof p.controls | undefined;
       const ctl = key ? p.controls[key] : null;
       // Implicit controls (auth, models, budget) have no single policy action: null.
-      return { ...r, label: r.parts, enabled: ctl ? ctl.enabled : true, action: ctl ? ctl.action : null, bypassRate: null as number | null };
+      return { ...r, label: r.parts, enabled: ctl ? ctl.enabled : true, action: ctl ? ctl.action : null, bypassRate: ctx.state.redteamByControl[r.controlId] ?? null };
     });
     return c.json({ controls: rows, notCovered: NOT_COVERED, policyVersion: ctx.policy().hash });
   });
@@ -189,11 +190,18 @@ export function adminRoutes(ctx: Ctx, policyPath: string) {
     });
   });
 
-  // Red Team Loop routes are added in M7; until then they report "no runs".
-  app.get("/redteam/status", (c) => c.json({ run: null, byControl: [], recent: [] }));
-  app.get("/redteam/runs", (c) => c.json({ items: [] }));
-  app.post("/redteam/run", (c) => c.json({ error: { type: "not_implemented", message: "Red Team Loop arrives in M7" } }, 501));
-  app.post("/redteam/abort", (c) => c.json({ ok: false }));
+  // Red Team Loop (SPEC §12). One run at a time; the run itself goes on in the background.
+  app.get("/redteam/status", (c) => c.json(redteam.status(c.req.query("runId") || undefined)));
+  app.get("/redteam/runs", (c) => c.json({ items: redteam.runs() }));
+  app.post("/redteam/run", async (c) => {
+    const body: unknown = await c.req.json().catch(() => ({}));
+    const parsed = RedteamConfigSchema.safeParse(body ?? {});
+    if (!parsed.success) return c.json({ error: { type: "invalid_request", message: parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ") } }, 400);
+    if (redteam.running()) return c.json({ error: { type: "conflict", message: `run ${redteam.running()} is still running` } }, 409);
+    try { return c.json({ runId: redteam.start(parsed.data) }, 202); }
+    catch (err) { return c.json({ error: { type: "invalid_request", message: err instanceof Error ? err.message : String(err) } }, 400); }
+  });
+  app.post("/redteam/abort", (c) => c.json({ ok: redteam.abort() }));
 
   app.post("/feed/reload", async (c) => c.json({ ok: await ctx.reloadFeed() }));
   return app;

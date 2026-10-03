@@ -48,5 +48,7 @@ export interface Ctx {
     lastRejected: { ts: string; errors: string[] } | null;
     feedLoadedAt: number | null;
     latestBypassRate: number | null;
+    /** Bypass rate per control from the latest finished red-team run (null = no attempts). */
+    redteamByControl: Record<string, number | null>;
   };
 }

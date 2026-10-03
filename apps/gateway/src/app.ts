@@ -27,6 +27,7 @@ import { createFeedSource } from "./feed/loader.ts";
 import { checkVersions } from "./feed/versions.ts";
 import { chatRoutes } from "./routes/chat.ts";
 import { adminRoutes } from "./routes/admin/index.ts";
+import { RedteamRunner } from "./redteam/runner.ts";
 import { prometheusText } from "./telemetry/prometheus.ts";
 import { metricsSummary } from "./telemetry/summary.ts";
 import { verifyFile } from "./audit/verify.ts";
@@ -44,6 +45,7 @@ const FALLBACK_PRICING: Pricing = {
 export interface Gateway {
   app: Hono;
   ctx: Ctx;
+  redteam: RedteamRunner;
   /** In-process policy override (tests): validated like a file, bypasses the watcher. */
   setPolicy(p: unknown): Loaded<Policy>;
   getPolicy(): Loaded<Policy>;
@@ -120,12 +122,13 @@ export function createGateway(opts: GatewayOptions): Gateway {
     pricingMissing: new Set(),
     state: {
       versionMatches: [], ollamaVersion: null, classifierReachable: null, lastVerify: null, lastRejected: null,
-      feedLoadedAt: feedSource.current() ? Date.now() : null, latestBypassRate: null,
+      feedLoadedAt: feedSource.current() ? Date.now() : null, latestBypassRate: null, redteamByControl: {},
     },
   };
   ctxRef = ctx;
   ctx.canaries.ensureGenerated();
   ctx.state.lastVerify = { ok: verifyFile(ctx.audit.path).ok, at: Date.now() };
+  const redteam = new RedteamRunner(ctx, { seedsDir: opts.seedsDir, generatedDir: opts.generatedDir });
 
   const refreshSemanticStatus = async () => {
     const s = await semantic.status(ctx.policy().value);
@@ -151,7 +154,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
   app.use("/metrics", cors({ origin: origins, allowHeaders: ["Authorization"] }));
   app.use("/v1/*", cors({ origin: origins, exposeHeaders: ["X-Tollgate-Decision", "X-Tollgate-Rule", "X-Tollgate-Tier", "X-Tollgate-Policy", "X-Tollgate-Event", "X-Tollgate-Latency"] }));
   app.route("/", chatRoutes(ctx));
-  app.route("/admin", adminRoutes(ctx, opts.policyPath));
+  app.route("/admin", adminRoutes(ctx, opts.policyPath, redteam));
   app.get("/healthz", async (c) => {
     const p = ctx.policy();
     const f = ctx.feed();
@@ -176,7 +179,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
   });
 
   return {
-    app, ctx,
+    app, ctx, redteam,
     setPolicy(p) {
       const value = PolicySchema.parse(p);
       const raw = YAML.stringify(value);
@@ -190,6 +193,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
       ctx.circuit.reset();
     },
     close() {
+      redteam.close();
       for (const t of timers) clearInterval(t);
       policyStore.close();
       pricingStore?.close();

@@ -158,6 +158,7 @@ budgets:
     redteam:
       tokens_per_hour: 5000000
       requests_per_minute: 2000
+      compute_seconds_per_hour: 36000    # tier 1 + tier 2 time on every attempt; a full depth-2 run needs hours of model time
   loop_breaker:
     enabled: true
     same_request_within: 60s

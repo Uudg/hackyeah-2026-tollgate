@@ -11,6 +11,8 @@ export interface Tier0Result {
   details: Record<string, unknown>;
 }
 
+const JOINED_CONTROLS = new Set(["prompt_injection", "signatures"]);
+
 const roleOf = (r: ChatMessage["role"]) => (r === "developer" ? "system" : r);
 
 export function runTier0(messages: ChatMessage[], tools: unknown[] | undefined, env: ScanEnv): Tier0Result {
@@ -25,6 +27,17 @@ export function runTier0(messages: ChatMessage[], tools: unknown[] | undefined, 
     if (!r.remapped) details.remapped = false;
     return r.redacted === null ? m : { ...m, content: r.redacted };
   });
+  // A payload split over several user turns ("reply OK after each part") is only visible when the turns are read
+  // together. The joined text is checked for injection and signatures; its hits cannot be redacted (no single field).
+  const turns = messages.filter((m) => m.role === "user").map(messageText).filter(Boolean);
+  if (turns.length >= 2) {
+    const seen = new Set(hits.map((h) => h.ruleId));
+    const joined = scanRequestField(turns.join(""), "user", "messages[*].content(joined user turns)", env).hits
+      .filter((h) => JOINED_CONTROLS.has(h.controlId === "decode" ? String(h.details?.innerControlId) : h.controlId) && !seen.has(h.ruleId))
+      .map((h) => (h.action === "redact" ? { ...h, action: "block" as const } : h));
+    if (joined.length) details.joinedTurns = turns.length;
+    hits.push(...joined);
+  }
   let keptTools = tools;
   if (tools && tools.length) {
     const c = env.policy.controls;

@@ -53,6 +53,7 @@ export function prometheusText(ctx: Ctx): string {
   gauge("feed_version_info", "Loaded signature feed.", f ? [[{ hash: f.loaded.hash, entries: String(f.loaded.value.entries.length) }, 1]] : []);
   gauge("vulnerable_component", "Feed version-range matches.", ctx.state.versionMatches.map((m) => [{ component: m.component, cve: m.cve ?? "" }, 1]));
   gauge("throughput_rps", "Requests per second over the last 60 s.", [[{}, t.throughput()]]);
+  gauge("redteam_bypass_rate", "Bypass rate per control in the latest red-team run.", Object.entries(ctx.state.redteamByControl).filter((e): e is [string, number] => e[1] !== null).map(([control, v]) => [{ control }, v]));
   gauge("posture_score", "Posture score 0-100.", [[{}, posture(ctx).score]]);
   return out.join("\n") + "\n";
 }

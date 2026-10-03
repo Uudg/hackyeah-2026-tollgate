@@ -24,6 +24,9 @@ export interface GatewayOptions {
   demoModel: string;
   /** Watch policy, feed and pricing files for changes (off in most tests). */
   watch: boolean;
+  /** Red Team Loop seed corpus and the folder its failing cases go to (default: tests/redteam/seeds, tests/cases/generated). */
+  seedsDir?: string;
+  generatedDir?: string;
   /** Background timers: metrics.tick, pruning, version checks. Off in tests that need a quiet process. */
   timers: boolean;
 }
