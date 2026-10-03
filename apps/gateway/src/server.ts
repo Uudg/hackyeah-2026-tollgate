@@ -1,4 +1,5 @@
 // Gateway entry: options from the environment, refuse to start without ADMIN_TOKEN, serve on TOLLGATE_PORT.
+import "./env.ts"; // loads the root .env before options are read
 import { createGateway } from "./app.ts";
 import { optionsFromEnv } from "./config.ts";
 import { log } from "./log.ts";

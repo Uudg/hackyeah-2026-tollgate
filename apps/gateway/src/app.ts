@@ -2,7 +2,7 @@
 // server.ts calls it with options from the environment; the test harness calls it in-process.
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { PolicySchema, type Policy } from "@tollgate/policy";
 import { createFileStore, parsePolicyText, policyHash, sha256, formatIssue, type FileStore, type Loaded } from "@tollgate/policy/loader";
 import YAML from "yaml";
@@ -79,7 +79,9 @@ export function createGateway(opts: GatewayOptions): Gateway {
     },
   }, { watch: opts.watch });
 
-  const pricingPath = resolve(opts.pricingPath ?? policyStore.current().value.budgets.pricing_file);
+  // Paths inside policy.yaml are relative to the policy file, not to the process cwd.
+  const fromPolicy = (p: string) => (/^https?:\/\//.test(p) ? p : resolve(dirname(opts.policyPath), p));
+  const pricingPath = opts.pricingPath ?? fromPolicy(policyStore.current().value.budgets.pricing_file);
   let pricingStore: FileStore<Pricing> | null = null;
   try {
     pricingStore = createFileStore(pricingPath, parsePricingText, {
@@ -96,7 +98,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
     : createOllamaProvider(opts.ollamaUrl, opts.ollamaKeepAlive);
   const upstream = opts.upstream === "echo" ? createEchoUpstream() : createHttpUpstream();
 
-  const feedSource = createFeedSource(opts.feedPath ?? policyStore.current().value.controls.signatures.feed, () => policyStore.current().value, bus, { watch: opts.watch, timers: opts.timers }, () => {
+  const feedSource = createFeedSource(opts.feedPath ?? fromPolicy(policyStore.current().value.controls.signatures.feed), () => policyStore.current().value, bus, { watch: opts.watch, timers: opts.timers }, () => {
     if (!ctxRef) return;
     ctxRef.state.feedLoadedAt = Date.now();
     ctxRef.telemetry.counters.feedReloads.inc({ result: "loaded" });

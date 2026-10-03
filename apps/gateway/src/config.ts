@@ -1,5 +1,5 @@
 // Gateway options. server.ts builds them from the environment (SPEC §2.1, .env.example); tests pass them directly.
-import { resolve } from "node:path";
+import { fromRoot } from "./env.ts";
 
 export type SemanticProviderName = "ollama" | "mock" | "off";
 export type UpstreamName = "ollama" | "echo";
@@ -33,10 +33,10 @@ const DEFAULT_MARKERS = "ignore previous instructions,jailbreak,DAN";
 export function optionsFromEnv(env: Record<string, string | undefined> = process.env): GatewayOptions {
   const pick = <T extends string>(v: string | undefined, allowed: readonly T[], dflt: T): T => (allowed.includes(v as T) ? (v as T) : dflt);
   return {
-    policyPath: resolve(env.TOLLGATE_POLICY ?? "./policy.yaml"),
-    feedPath: env.TOLLGATE_FEED || undefined,
-    pricingPath: env.TOLLGATE_PRICING || undefined,
-    dataDir: resolve(env.TOLLGATE_DATA_DIR ?? "./data"),
+    policyPath: fromRoot(env.TOLLGATE_POLICY ?? "./policy.yaml"),
+    feedPath: env.TOLLGATE_FEED ? (/^https?:/.test(env.TOLLGATE_FEED) ? env.TOLLGATE_FEED : fromRoot(env.TOLLGATE_FEED)) : undefined,
+    pricingPath: env.TOLLGATE_PRICING ? fromRoot(env.TOLLGATE_PRICING) : undefined,
+    dataDir: fromRoot(env.TOLLGATE_DATA_DIR ?? "./data"),
     upstream: pick(env.UPSTREAM, ["ollama", "echo"] as const, "ollama"),
     semanticProvider: pick(env.SEMANTIC_PROVIDER, ["ollama", "mock", "off"] as const, "ollama"),
     ollamaUrl: (env.OLLAMA_URL ?? "http://127.0.0.1:11434").replace(/\/$/, ""),

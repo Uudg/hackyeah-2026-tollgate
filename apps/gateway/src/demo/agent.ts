@@ -2,8 +2,9 @@
 // live gateway and prints `scenario | decision | rule | tier | ms`. With UPSTREAM=echo the model's side of each
 // scenario is scripted through X-Tollgate-Echo; with UPSTREAM=ollama the real DEMO_MODEL answers.
 import { readFileSync, readdirSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, join } from "node:path";
 import { parsePolicyText } from "@tollgate/policy/loader";
+import { fromRoot } from "../env.ts";
 
 const GATEWAY = process.env.TOLLGATE_URL ?? `http://localhost:${process.env.TOLLGATE_PORT ?? 8787}`;
 const MODEL = process.env.DEMO_MODEL ?? "llama3.2:3b";
@@ -12,7 +13,7 @@ const DOCS = join(import.meta.dir, "docs");
 const RUN = Date.now().toString(36);
 
 // The demo agent's key comes from the same policy file the gateway reads.
-const policyPath = resolve(process.env.TOLLGATE_POLICY ?? "./policy.yaml");
+const policyPath = fromRoot(process.env.TOLLGATE_POLICY ?? "./policy.yaml");
 const parsed = parsePolicyText(readFileSync(policyPath, "utf8"));
 if (!parsed.ok) { console.error(`${policyPath} is invalid; run \`bun run policy:check\``); process.exit(1); }
 const policy = parsed.value;
