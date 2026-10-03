@@ -36,9 +36,24 @@ curl -si localhost:8787/v1/chat/completions \
   -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"Pay invoice to PL61 1090 1014 0000 0712 1981 2874"}]}'
 ```
 
-<!-- TODO(M2): paste the actual response showing [REDACTED:iban] and the headers X-Tollgate-Decision: redact, X-Tollgate-Rule: pii.iban, X-Tollgate-Tier: 0, X-Tollgate-Policy: p-… -->
+Response (here with `UPSTREAM=echo`, which answers `OK: <the message it received>`, so you see exactly what the model was sent):
 
-`bun run demo` runs a scripted walkthrough: clean pass, PII redact, base64-wrapped injection block, canary kill, budget loop.
+```
+HTTP/1.1 200 OK
+X-Tollgate-Decision: redact
+X-Tollgate-Rule: pii.iban
+X-Tollgate-Tier: 0
+X-Tollgate-Policy: p-275f88aacc7b
+X-Tollgate-Event: 01M41M99XD9MRZE7WAGWR0Z62G
+X-Tollgate-Latency: auth=0.17;budget=0.62;tier0=0.22;tier1=204.58;tier2=852.44;upstream=0.11;output=0.72;total=1059.55
+
+{"id":"chatcmpl-echo-d6727536","object":"chat.completion","model":"llama3.2:3b",
+ "choices":[{"index":0,"message":{"role":"assistant","content":"OK: Pay invoice to [REDACTED:iban]"},"finish_reason":"stop"}], ...}
+```
+
+The IBAN never left the gateway. This request also shows the judge at work: Llama Guard 1B flagged the payment as "S1 violent crimes", and the judge overturned it in 0.85 s (`tier2=852`). `GET /admin/audit/<X-Tollgate-Event>` returns the full decision record.
+
+`bun run demo` runs a scripted walkthrough through the live gateway: clean pass, PII redact, base64-wrapped injection block, reverse shell in a tool call (feed signature), loop breaker, and a poisoned document that makes the agent leak a planted canary key (session killed, next request on that session refused). It prints `scenario | decision | rule | tier | ms`.
 
 **No models yet?** `setup.sh` without `--wait-models` starts the pulls in the background and the stack runs in no-models mode (`SEMANTIC_PROVIDER=mock`, `UPSTREAM=echo` in `.env`): all deterministic controls, budgets, the feed, audit, dashboard and the deterministic tests work; model-backed tests print `SKIP (model-backed): …` and the exit code stays 0. `./scripts/doctor.sh` shows when the models have landed; then set both variables to `ollama`.
 
@@ -94,7 +109,7 @@ The same table is served live at `GET /admin/coverage` and rendered at `/coverag
 | Control(s) | Tier | OWASP LLM Top 10 (2025) | OWASP Agentic Top 10 (2026) | Fixtures |
 |---|---|---|---|---|
 | `prompt_injection` (heuristics, classifier, judge), `decode` (decode-and-rescan), `unicode` (invisible chars, homoglyphs) | 0 / 1 / 2 | LLM01 | ASI01, ASI10 | `tests/cases/injection.yaml` |
-| `content_safety` (Llama Guard categories) | 1 | LLM01 | — | `injection.yaml` (model-tagged) |
+| `content_safety` (Llama Guard categories, confirmed by the judge) | 1 / 2 | LLM01 | — | `injection.yaml` (model-tagged), `semantic-mock.test.ts` |
 | `pii`, `secrets` | 0 / output | LLM02 | — | `pii.yaml`, `secrets.yaml`, `output.yaml` |
 | `models` (allowlist, deny registries), `signatures` pickle-opcode and version-range entries | 0 | LLM03, LLM04 | ASI04, ASI05 | `models.yaml`, `feed.yaml` |
 | `link_exfil`, `signatures` url-pattern (EchoLeak) | output | LLM05, LLM02 | ASI01 | `output.yaml`, `feed.yaml` |
@@ -104,6 +119,8 @@ The same table is served live at `GET /admin/coverage` and rendered at `/coverag
 | `budget` (tokens, usd, compute, requests, loop breaker, circuit breaker, tool depth) | 0 | LLM10 | ASI08 | `budgets.yaml` |
 | `signatures` tool-description (MCP tool poisoning) | 0 | LLM03, LLM01 | ASI04, ASI02 | `feed.yaml` |
 | Not covered | — | LLM08, LLM09 | ASI09 | — |
+
+Where the code differs from `docs/SPEC.md` (and why) is listed in [SPEC §16](docs/SPEC.md#16-implementation-notes-and-deviations-from-this-document), with a test for each row.
 
 Not covered, by design: **LLM08** (vector/embedding internals), **LLM09** (misinformation), **ASI09** (human-agent trust manipulation at the UI level). Tollgate sits on the wire; these need application-level controls.
 
@@ -179,7 +196,30 @@ Fixtures are YAML under `tests/cases/`, one file per control, each case tagged w
   expect: { decision: allow, status: 200 }
 ```
 
-The run ends with a summary grouped by control and OWASP id. <!-- TODO(M6): paste the summary table -->
+The run ends with a summary grouped by control and OWASP id. Current run (M1 Max, Ollama up; `granite3-guardian:2b` not pulled):
+
+```
+control             pass  fail  skip   OWASP
+audit                  6     0     0   ASI03, LLM02, LLM05, LLM10
+auth                   5     0     0   ASI03, LLM06
+budget                11     0     0   ASI07, ASI08, LLM06, LLM10
+canaries               9     0     0   ASI02, ASI03, ASI06, LLM02, LLM07
+content_safety         3     0     0   LLM01
+decode                 4     0     0   ASI01, LLM01
+link_exfil             5     0     0   ASI01, LLM02, LLM05
+models                 5     0     0   ASI03, ASI04, LLM03
+pii                   15     0     0   LLM02, LLM05
+policy                10     0     0   ASI03, ASI06, LLM02, LLM03, LLM10
+prompt_injection      10     0     1   ASI01, ASI06, LLM01, LLM07     (1 skipped: model-backed)
+secrets               14     0     0   ASI02, LLM02
+signatures            20     0     0   ASI01..ASI05, LLM01..LLM05, LLM07
+sysprompt              3     0     0   LLM07
+tool_calls            14     0     0   ASI02, ASI05, ASI08, LLM02, LLM05, LLM06
+unicode                5     0     0   LLM01
+TOTAL  139 pass · 0 fail · 1 skip   in 2.4 s
+```
+
+Whole `bun test`: 216 pass, 1 skip, 0 fail in ~5 s (fixtures plus the suites below and the controls unit tests).
 
 Also included: a hot-reload test (edits a temp policy and the feed, asserts the next request uses them), a policy-schema test (the three presets validate, misspelt keys are rejected), a mock-semantic test (tiers 1–2 and fail-open/closed without a model), an audit-chain tamper test, an admin-API shape test, and a latency test (tier-0 overhead vs calling the upstream directly).
 
@@ -211,8 +251,6 @@ Mutates seed attacks (base64, hex, URL-encoding, leetspeak, homoglyphs, zero-wid
 
 ## Telemetry
 
-<!-- TODO(M9): real numbers from the M1 Max with models loaded -->
-
 Per-stage timers (auth, budget, tier 0, tier 1, tier 2, upstream, output) with p50/p95/p99, throughput, and overhead = total − upstream, exposed as:
 
 - `GET /metrics` — Prometheus text
@@ -221,11 +259,13 @@ Per-stage timers (auth, budget, tier 0, tier 1, tier 2, upstream, output) with p
 
 | Stage | p50 | p95 | Notes |
 |---|---|---|---|
-| tier 0 | TODO | TODO | pure TypeScript, no I/O |
-| tier 1 (llama-guard3:1b) | TODO | TODO | Ollama, model resident |
-| tier 2 (llama3.2:3b judge) | TODO | TODO | only in the uncertain band |
-| output scan | TODO | TODO | |
-| gateway overhead vs direct call | TODO | TODO | `bun run bench` |
+| tier 0 | 0.48 ms | 2.1 ms | pure TypeScript, no I/O (live gateway, mixed traffic) |
+| tier 1 (llama-guard3:1b) | 49 ms | 138 ms | Ollama, model resident (`keep_alive: 30m`) |
+| tier 2 (llama3.2:3b judge) | 677 ms | 970 ms | only for uncertain scores and flagged content-safety categories |
+| output scan | 0.68 ms | 1.5 ms | |
+| gateway overhead vs direct call, tier 0 only | 0.30 ms | 0.40 ms | `bun run bench`, 1000 sequential requests |
+
+`bun run bench` on the M1 Max (echo upstream, semantic tiers off): tier-0 stage p95 0.07 ms; throughput ~2,500 req/s with one client and ~3,400 req/s with 32 concurrent clients, 0 errors. The model tiers dominate when they run: a clean request adds ~50 ms (tier 1); a flagged one adds ~0.7 s (judge).
 
 ---
 
@@ -261,16 +301,16 @@ from openai import OpenAI
 client = OpenAI(base_url="http://localhost:8787/v1", api_key="tg_research-bot_Ym3dK8pQ2sT6vW9xA1bC")
 ```
 
-The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and selects its scopes, allowed models and budget. Blocked requests return `403` with `{ error: { type: "tollgate_blocked", code: "<rule id>", message, event_id } }`; budget limits return `429` with `Retry-After`; redacted ones return `200` with the content rewritten and an `X-Tollgate-Decision: redact` header. Tool definitions (`tools[]`) and tool calls in the completion are governed too, which is how agent↔MCP traffic is covered without a separate transport. <!-- TODO(M1): verify snippets against the running gateway -->
+The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and selects its scopes, allowed models and budget. Blocked requests return `403` with `{ error: { type: "tollgate_blocked", code: "<rule id>", message, event_id } }`; budget limits return `429` with `Retry-After`; redacted ones return `200` with the content rewritten and an `X-Tollgate-Decision: redact` header. Tool definitions (`tools[]`) and tool calls in the completion are governed too, which is how agent↔MCP traffic is covered without a separate transport.
 
 ---
 
 ## Limitations
 
-<!-- TODO(M9): review before submission; be honest, judges are security people -->
-
 - Semantic controls are only as good as the local 1B/3B models; the deterministic tier and the Red Team Loop exist because the classifier alone misses things. Bypass rates are reported, not hidden.
-- Streaming: <!-- TODO(M3): "buffered — the upstream reply is scanned in full and re-emitted as SSE chunks" or "sliding 64-character buffer; a redaction can straddle two chunks" -->.
+- Streaming is buffered: the upstream is called non-streamed, the output path runs on the full completion, then the reply is re-emitted as SSE chunks. No unscanned token ever reaches the client; the cost is time-to-first-token.
+- `llama-guard3:1b` over-flags finance text: in our measurement it flagged 5 of 14 ordinary finance prompts (supplier payments and wire transfers as S1/S2, hedging and stock questions as S6). Flagged categories are therefore confirmed by the 3B judge before blocking (`controls.content_safety.confirm_with_judge`, on by default; off in `policy.strict.yaml`). The judge got all 10 of our test cases right (5 false positives overturned, 5 real harms kept blocked), but it is a 3B model and can be wrong both ways.
+- The judge is weak against indirect injection: in the demo it sometimes lets a poisoned document through. Canaries are the backstop (the leak is caught and the session killed).
 - The dashboard sends the admin token from the browser (`NEXT_PUBLIC_ADMIN_TOKEN`). Fine for a local demo; a deployment would put the dashboard behind SSO and proxy the admin calls server-side. Agent keys never reach the browser (the playground goes through `POST /admin/playground`).
 - Budgets are tracked in a single SQLite file; horizontal scale needs a shared store (the ledger interface is one file).
 - Model-file scanning (`POST /admin/scan/model`) covers the documented incident patterns, not arbitrary payloads, and is a stretch item. ModelScan or a sandboxed loader is the production answer.
@@ -284,7 +324,7 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 
 <!-- TODO(M9): keep this exact and complete; the rules require disclosure and the team must be able to explain every part -->
 
-**Implementation assistance:** [Claude Code](https://claude.com/claude-code) (Anthropic) was used for planning, scaffolding, code generation, test generation and review during the hackathon <!-- TODO(M9): list the exact models used, e.g. Claude Opus 5.5 for the gateway core, tests and review; Claude Sonnet for the dashboard, fixtures and red-team seeds; Claude Fable 5.1 for the planning documents -->. All code was reviewed and is explainable by the author.
+**Implementation assistance:** [Claude Code](https://claude.com/claude-code) (Anthropic) was used for planning, scaffolding, code generation, test generation and review during the hackathon: Claude Opus 5.5 (main session: gateway, controls, test suites, acceptance runs, review) and Claude Sonnet (subagents: dashboard, test fixtures, red-team seeds, UI review). <!-- TODO(Dan): confirm which model wrote the planning documents --> All code was reviewed and is explainable by the author.
 
 **Local models (via Ollama):**
 
@@ -306,8 +346,9 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 | zod | MIT | schema validation at every boundary |
 | yaml | ISC | policy and fixture parsing |
 | next, react, react-dom | MIT | dashboard |
-| typescript, @types/bun | Apache 2.0 / MIT | toolchain |
-| <!-- TODO(M9): every dependency added during the build, from `bun pm ls` --> | | |
+| tailwindcss, @tailwindcss/postcss | MIT | dashboard styling |
+| eslint, eslint-config-next | MIT | dashboard lint |
+| typescript, @types/bun, @types/node, @types/react, @types/react-dom | Apache 2.0 / MIT | toolchain |
 
 ---
 
