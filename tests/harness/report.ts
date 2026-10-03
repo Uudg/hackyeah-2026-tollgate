@@ -7,9 +7,12 @@ export interface CaseResult { id: string; control: string; owasp: string[]; stat
 
 const results: CaseResult[] = [];
 export const record = (r: CaseResult) => { results.push(r); };
+/** Open red-team bypasses (tests/cases/generated/*-open.yaml): counted, not run, not in pass/fail/skip. */
+const backlog: string[] = [];
+export const recordBacklog = (id: string) => { backlog.push(id); };
 
 export function printSummary(meta: { policy: string; feed: string | null; root: string; startedAt: number }) {
-  if (results.length === 0) return;
+  if (results.length === 0 && backlog.length === 0) return;
   const byControl = new Map<string, { pass: number; fail: number; skip: number; owasp: Set<string>; modelSkips: number }>();
   const byOwasp = new Map<string, { pass: number; total: number }>();
   for (const r of results) {
@@ -34,11 +37,12 @@ export function printSummary(meta: { policy: string; feed: string | null; root: 
   lines.push(`by OWASP id: ${owaspLine}`);
   const total = { pass: results.filter((r) => r.status === "pass").length, fail: results.filter((r) => r.status === "fail").length, skip: results.filter((r) => r.status === "skip").length };
   lines.push(`TOTAL  ${total.pass} pass · ${total.fail} fail · ${total.skip} skip   in ${((Date.now() - meta.startedAt) / 1000).toFixed(1)} s`);
+  if (backlog.length) lines.push(`known open bypasses (red-team backlog): ${backlog.length}   not run, not counted above; tests/cases/generated/*-open.yaml, run them with TOLLGATE_BACKLOG=1 bun test`);
   for (const r of results.filter((x) => x.status === "fail")) lines.push(`  FAIL ${r.id}: ${r.reason ?? ""}`);
   console.log("\n" + lines.join("\n"));
   const generated = results.filter((r) => r.tags.includes("generated"));
   writeFileSync(join(meta.root, "tests/.last-report.json"), JSON.stringify({
     ts: new Date().toISOString(), policy: meta.policy, feed: meta.feed, total, results,
-    generated: { total: generated.length, passing: generated.filter((r) => r.status === "pass").length },
+    generated: { total: generated.length + backlog.length, passing: generated.filter((r) => r.status === "pass").length, backlog: backlog.length },
   }, null, 2));
 }
