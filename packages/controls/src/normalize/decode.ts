@@ -93,8 +93,9 @@ const LEET: Record<string, string> = { "4": "a", "3": "e", "1": "i", "0": "o", "
 export function foldLeet(text: string): string | null {
   let changed = 0;
   const out = text.replace(/[\p{L}\d@$]+/gu, (w, at: number) => {
-    // Skip %XX escapes, hex strings, long tokens (keys, digests) and words without both letters and leet digits.
-    if (text[at - 1] === "%" || w.length > 24 || /^[0-9a-f]+$/i.test(w) || !/\p{L}/u.test(w) || !/[013457@$]/.test(w)) return w;
+    // Skip %XX escapes, hex strings, tokens (long, or with digits that are not leet: keys, ids, digests) and words
+    // without both letters and leet digits.
+    if (text[at - 1] === "%" || w.length > 16 || /[2689]/.test(w) || /^[0-9a-f]+$/i.test(w) || !/\p{L}/u.test(w) || !/[013457@$]/.test(w)) return w;
     changed++;
     return w.replace(/[013457@$]/g, (ch) => LEET[ch]!);
   });

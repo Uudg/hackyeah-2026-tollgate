@@ -57,10 +57,11 @@ export function scanRequestField(text: string, role: Role, field: string, env: S
   }
   const ignore = [...env.ignore, ...env.canaries.map((k) => k.token)];
   const untrusted = role !== "system";
-  const scanVariant = (t: string): Hit[] => {
+  // literal = false for the leetspeak rewrite: secrets and PII are literal strings, folding them only invents new ones.
+  const scanVariant = (t: string, literal = true): Hit[] => {
     const out: Hit[] = [];
-    if (c.secrets.enabled) out.push(...scanSecrets(t, { action: c.secrets.action, entropyMin: c.secrets.entropy_min, entropyMinLen: c.secrets.entropy_min_len, patterns: c.secrets.patterns, field, ignore }));
-    if (c.pii.enabled && (untrusted || c.pii.scan_system_prompt)) out.push(...scanPii(t, { entities: c.pii.entities, action: c.pii.action, field }));
+    if (literal && c.secrets.enabled) out.push(...scanSecrets(t, { action: c.secrets.action, entropyMin: c.secrets.entropy_min, entropyMinLen: c.secrets.entropy_min_len, patterns: c.secrets.patterns, field, ignore }));
+    if (literal && c.pii.enabled && (untrusted || c.pii.scan_system_prompt)) out.push(...scanPii(t, { entities: c.pii.entities, action: c.pii.action, field }));
     if (!untrusted) return out;
     if (c.prompt_injection.enabled && c.prompt_injection.heuristics) out.push(...scanInjection(t, { action: c.prompt_injection.action, field }));
     if (c.signatures.enabled && env.feed) out.push(...scanSignatures(t, env.feed, { scope: "request", defaultAction: c.signatures.action, field, allowDomains: c.link_exfil.allow_domains }));
@@ -74,7 +75,7 @@ export function scanRequestField(text: string, role: Role, field: string, env: S
     const d = decodeVariants(n.text, c.decode.max_depth);
     decodeTruncated = d.truncated;
     for (const v of d.variants) {
-      for (const inner of scanVariant(v.text)) {
+      for (const inner of scanVariant(v.text, v.encoding !== "leet")) {
         // A hit hidden inside an encoding is reported as decode.rescan, with the inner rule's action.
         hits.push({
           controlId: "decode", ruleId: "decode.rescan", action: inner.action, owasp: union(inner.owasp, ["LLM01"]),
