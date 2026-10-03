@@ -55,7 +55,16 @@ export const PolicySchema = z.strictObject({
   }).prefault({}),
 
   agents: z.record(z.string().regex(/^[a-z0-9-]+$/), AgentSchema)
-    .refine((a) => Object.keys(a).length > 0, "at least one agent"),
+    .refine((a) => Object.keys(a).length > 0, "at least one agent")
+    // Two agents with one key: the later one would silently take the identity, models and budget (hardening finding).
+    .superRefine((a, ctx) => {
+      const seen = new Map<string, string>();
+      for (const [id, agent] of Object.entries(a)) {
+        const other = seen.get(agent.key);
+        if (other) ctx.addIssue({ code: "custom", path: [id, "key"], message: `same key as agent "${other}"` });
+        else seen.set(agent.key, id);
+      }
+    }),
 
   models: z.strictObject({
     allow: z.array(z.string()).min(1),

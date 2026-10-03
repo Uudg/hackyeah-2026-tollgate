@@ -25,7 +25,20 @@ export const ChatRequestSchema = z.object({
   tools: z.array(z.unknown()).optional(),
   stream: z.boolean().optional(),
   max_tokens: z.number().int().positive().optional(),
-}).passthrough();
+  /** The current OpenAI name for max_tokens; the budget pre-check reserves whichever is given. */
+  max_completion_tokens: z.number().int().positive().optional(),
+  /** Completions per request; the pre-check reserves max_tokens × n. */
+  n: z.number().int().min(1).max(8).optional(),
+}).passthrough().superRefine((b, ctx) => {
+  // Legacy function calling would pass through unchanged and skip the tools scope, the tool deny list and the
+  // tool-call gate, which only read tools[] / tool_calls. Ollama does not support it either, so it is refused.
+  const legacy = "use tools / tool_calls; legacy function calling is not supported";
+  if (b.functions != null) ctx.addIssue({ code: "custom", path: ["functions"], message: legacy });
+  if (b.function_call != null) ctx.addIssue({ code: "custom", path: ["function_call"], message: legacy });
+  b.messages.forEach((m, i) => {
+    if ("function_call" in m && m.function_call != null) ctx.addIssue({ code: "custom", path: ["messages", i, "function_call"], message: legacy });
+  });
+});
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
 export const ChatCompletionSchema = z.object({

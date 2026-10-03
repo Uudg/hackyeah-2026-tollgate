@@ -1,6 +1,7 @@
 // Homoglyph folding (SPEC §2.2 step 3a.3). NFKC already maps fullwidth forms and mathematical alphanumerics
 // to ASCII; this table covers the Cyrillic and Greek letters NFKC leaves alone.
 // Only words that mix Latin with these letters are folded: plain Russian or Greek text stays untouched.
+// Small capitals are handled separately (see SMALL_CAPS).
 const MAP: Record<string, string> = {
   "\u0430": "a", "\u0432": "b", "\u0435": "e", "\u043A": "k", "\u043C": "m", "\u043D": "h", "\u043E": "o", "\u0440": "p", "\u0441": "c", "\u0442": "t", "\u0443": "y", "\u0445": "x",
   "\u0456": "i", "\u0458": "j", "\u0455": "s", "\u0501": "d", "\u051B": "q", "\u051D": "w", "\u04BB": "h", "\u04CF": "l", "\u0261": "g",
@@ -9,15 +10,31 @@ const MAP: Record<string, string> = {
   "\u03B1": "a", "\u03BF": "o", "\u03BD": "v", "\u03B9": "i", "\u03C1": "p", "\u03C4": "t", "\u03C5": "u", "\u03BA": "k", "\u03B5": "e",
   "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u0396": "Z", "\u0397": "H", "\u0399": "I", "\u039A": "K", "\u039C": "M", "\u039D": "N", "\u039F": "O", "\u03A1": "P", "\u03A4": "T", "\u03A5": "Y", "\u03A7": "X",
 };
+// "Fancy text" small capitals (ɪɢɴᴏʀᴇ). No natural language writes words in them; IPA uses a few (ɪ ʀ ʟ ɴ ɢ ʏ ʙ ʜ)
+// inside otherwise Latin words. They are folded everywhere; only words made entirely of them count as homoglyphs, so
+// a pronunciation like /bɪt/ is never a hit.
+const SMALL_CAPS: Record<string, string> = {
+  "ᴀ": "a", "ʙ": "b", "ᴄ": "c", "ᴅ": "d", "ᴇ": "e", "ꜰ": "f", "ɢ": "g", "ʜ": "h",
+  "ɪ": "i", "ᴊ": "j", "ᴋ": "k", "ʟ": "l", "ᴍ": "m", "ɴ": "n", "ᴏ": "o", "ᴘ": "p",
+  "ʀ": "r", "ꜱ": "s", "ᴛ": "t", "ᴜ": "u", "ᴠ": "v", "ᴡ": "w", "ʏ": "y", "ᴢ": "z",
+};
 const LATIN = /[A-Za-z]/;
 const CONFUSABLE = /[\u0370-\u03FF\u0400-\u052F\u0261]/;
+const SMALL = new RegExp(`[${Object.keys(SMALL_CAPS).join("")}]`, "u");
 
 export function foldHomoglyphs(text: string): { text: string; count: number } {
   let count = 0;
   const out = text.replace(/[\p{L}\p{M}\p{N}_]+/gu, (word) => {
-    if (!LATIN.test(word) || !CONFUSABLE.test(word)) return word;
+    let w = word;
+    if (SMALL.test(w)) {
+      const chars = [...w];
+      const allSmall = chars.every((ch) => SMALL_CAPS[ch] !== undefined);
+      w = chars.map((ch) => SMALL_CAPS[ch] ?? ch).join("");
+      if (allSmall) count += chars.length;
+    }
+    if (!LATIN.test(w) || !CONFUSABLE.test(w)) return w;
     let folded = "";
-    for (const ch of word) {
+    for (const ch of w) {
       const ascii = MAP[ch];
       if (ascii) { count++; folded += ascii; } else folded += ch;
     }

@@ -157,3 +157,29 @@ Before hardening: 1180 attempts, 268 bypasses (22.7 %). After: 185 bypasses (15.
 
 ### Next
 Hardening pass on the open list where a deterministic fix is cheap (output-side case folding for PII/secrets, joined-turn PII); README screenshots, architecture.png, LICENSE, slides.
+
+## Hardening pass — HANDOFF §7.1 (Sun 4 Oct, ~00:45 CEST)
+
+### Done
+- Four parallel adversarial tracks (Opus subagents: injection, input, budget/auth/audit, output path; main session: `scan.ts`, schema, merge), then an independent review of the whole diff (Sonnet). Fixes and tests only, no new features. SPEC §16 D23–D27.
+- New fixtures: `hardening-injection.yaml` (37), `hardening-input.yaml` (31), `hardening-output.yaml` (28), `hardening-budget-auth.yaml`; new suites `hardening-infra.test.ts`, `hardening-review.test.ts`.
+- Worst finds: a blocked half-open circuit probe left every request at 503 until restart; concurrent requests could all pass the same budget pre-check (now reserve/settle); five quadratic regexes (one 40–80 kB field froze the gateway for 2.5–32 s, scanning is synchronous; now linear, plus a 4 MB body cap); "AsiaPacificMarketing" was a 403 as an AWS key; a `.`-separated sentence escaped heuristic 1.
+
+### Red team, depth 1 (88 seeds, rng_seed 1, semantic tiers on)
+| | attempts | bypasses | rate |
+|---|---:|---:|---:|
+| M7 first run | 1180 | 268 | 22.7 % |
+| after M7 fixes | 1180 | 185 | 15.7 % |
+| after hardening | 1204 | 160 | 13.3 % |
+
+Per control after hardening: sysprompt 22.5 → 7.7 %, secrets 7.6 → 1.4 %, pii 4.2 → 0.7 %, prompt_injection 19.0 → 14.8 %, content_safety 13.5 → 12.7 %, tool_calls 34.1 % (unchanged: request-side tool intents, the tool call is checked on the response path), link_exfil 6.0 % (payload split into fragments), signatures 12.4 → 14.3 % (model variance on the tier 1/2 cases). 24 more attempts because encoding chains now also run on response seeds.
+Backlog: 33 of the 183 open cases now pass (`01M41R2A…-fixed.yaml`); the open list is replaced by the new run's 160 (`01M41Y6A…-open.yaml`): 105 paraphrase jailbreaks, 43 request-side tool intents, 12 character-level output obfuscations.
+
+### Tests
+`bun run check` clean. `bun test`: 503 pass, 2 skip, 0 fail (fixtures 354 pass, 1 model skip; backlog line 160). Tier-0 overhead p50 0.51 ms, p95 0.82 ms; tier 1 p50 57 ms.
+
+### Decisions made without asking
+- When the caller sends no `max_tokens`, `budgets.default_max_tokens` is sent upstream as the cap (otherwise the reservation means nothing). A long answer can stop at 1024 tokens with `finish_reason: length`; raise the key or drop the cap if that bites.
+- `kill_session` is per (agent, session id): a new session id escapes it. Documented in README limitations instead of a new policy key.
+- A single combining mark (x̄, IPA) no longer counts toward `unicode.max_invisible`; stacked marks (Zalgo) still do.
+- Test policy only: semantic timeouts 10 s / 20 s, so a busy judge machine does not fail open and turn model-backed cases red. The shipped policy keeps 1.5 s / 6 s.

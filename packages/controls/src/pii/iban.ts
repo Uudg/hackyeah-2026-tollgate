@@ -3,7 +3,19 @@ const LENGTHS: Record<string, number> = {
   PL: 28, DE: 22, GB: 22, FR: 27, LT: 20, LV: 21, EE: 20, ES: 24, IT: 27, NL: 18, BE: 16, AT: 20, CH: 21, CZ: 24, SK: 24, IE: 22, PT: 25, SE: 24, NO: 15, DK: 18, FI: 18,
 };
 
-export const IBAN_RE = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b/g;
+// Case-insensitive: "pl61 1090 ..." is the same account (the red team's case_shuffle beat the upper-case-only form).
+// Groups may be split by spaces or dashes ("PL61-1090-1014-...").
+export const IBAN_RE = /\b[A-Z]{2}\d{2}(?:[ -]?[A-Z0-9]){11,30}\b/gi;
+
+/**
+ * Polish domestic account number (NRB): the PL IBAN without "PL", 26 digits written "61 1090 1014 0000 0712 1981 2874"
+ * or run together. Reported as pii.iban when "PL" + the digits passes the IBAN checksum.
+ */
+export const NRB_RE = /(?<![\w-])\d{2}(?:[ ]?\d{4}){6}(?![\w-])/g;
+
+export function nrbMatchLength(m: string): number {
+  return ibanValid("PL" + m.replace(/ /g, "")) ? m.length : 0;
+}
 
 export function ibanValid(compact: string): boolean {
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(compact)) return false;
@@ -24,7 +36,7 @@ export function ibanValid(compact: string): boolean {
 export function ibanMatchLength(m: string): number {
   const pos: number[] = [];
   let compact = "";
-  for (let i = 0; i < m.length; i++) if (m[i] !== " ") { compact += m[i]; pos.push(i); }
+  for (let i = 0; i < m.length; i++) if (m[i] !== " " && m[i] !== "-") { compact += m[i]!.toUpperCase(); pos.push(i); }
   for (let len = Math.min(34, compact.length); len >= 15; len--) {
     if (ibanValid(compact.slice(0, len))) return pos[len - 1]! + 1;
   }

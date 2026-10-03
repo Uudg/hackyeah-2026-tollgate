@@ -3,7 +3,7 @@ import type { Action, Hit } from "@tollgate/policy";
 
 export type { Action, Hit };
 
-export type Encoding = "base64" | "hex" | "url" | "html" | "leet" | "concat";
+export type Encoding = "base64" | "hex" | "url" | "html" | "leet" | "concat" | "rot13" | "despace" | "squash" | "entities";
 export type Surface = "request" | "response" | "tool_call";
 
 /** A canary token as the gateway loads it from SQLite and policy.canaries.tokens. */

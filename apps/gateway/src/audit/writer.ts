@@ -1,9 +1,10 @@
 // Append-only, hash-chained audit log (SPEC §9). One in-process queue: hashes are computed in call order,
 // lines are written in batches off the request path, fsync every 100 ms or 50 lines.
 import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, statSync, truncateSync, writeSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { DecisionRecord } from "@tollgate/policy";
-import { GENESIS, lineHash, type AuditLine } from "./chain.ts";
+import { brokenName, GENESIS, lineHash, parseHead, rotatedFiles, rotatedName, type AuditLine } from "./chain.ts";
+import { log } from "../log.ts";
 
 export class AuditWriter {
   readonly path: string;
@@ -23,23 +24,35 @@ export class AuditWriter {
     this.syncTimer = setInterval(() => this.sync(), 100);
   }
 
-  /** Read the last line to continue seq and prev_hash; drop a truncated last line left by a crash. */
+  /**
+   * Continue seq and prev_hash from the last line. A truncated last line (crash mid-write) is dropped. A complete
+   * last line that is not an audit record (hand-edited file) cannot be continued: the file is moved aside as
+   * audit-<ts>.broken.jsonl and a new chain starts at genesis, so the gateway still starts. An empty or missing
+   * file continues from the newest rotated file, so the chain spans rotations and restarts.
+   */
   private resume() {
-    if (!existsSync(this.path)) return;
-    const text = readFileSync(this.path, "utf8");
-    if (!text) return;
+    const text = existsSync(this.path) ? readFileSync(this.path, "utf8") : "";
     let end = text.length;
-    if (!text.endsWith("\n")) {
+    if (text && !text.endsWith("\n")) {
       end = text.lastIndexOf("\n") + 1;
       truncateSync(this.path, Buffer.byteLength(text.slice(0, end)));
-      console.log(JSON.stringify({ level: "warn", msg: "audit: dropped a truncated last line", path: this.path }));
+      log("warn", "audit: dropped a truncated last line", { path: this.path });
     }
-    const lines = text.slice(0, end).trimEnd().split("\n");
-    const last = lines[lines.length - 1];
-    if (!last) return;
-    const parsed = JSON.parse(last) as AuditLine;
-    this.seq = parsed.seq;
-    this.prev = parsed.hash;
+    const last = text.slice(0, end).trimEnd().split("\n").at(-1);
+    if (last) {
+      const head = parseHead(last);
+      if (head.ok) { this.seq = head.seq; this.prev = head.hash; return; }
+      const moved = join(dirname(this.path), brokenName());
+      renameSync(this.path, moved);
+      log("warn", "audit: last line is not an audit record; moved the file aside and started a new chain at genesis", { path: this.path, movedTo: moved, reason: head.reason });
+      return;
+    }
+    const newest = rotatedFiles(dirname(this.path)).at(-1);
+    if (!newest) return;
+    const prevLast = readFileSync(join(dirname(this.path), newest), "utf8").trimEnd().split("\n").at(-1);
+    const head = prevLast ? parseHead(prevLast) : null;
+    if (head?.ok) { this.seq = head.seq; this.prev = head.hash; }
+    else log("warn", "audit: newest rotated file has no readable last line; starting a new chain at genesis", { file: newest, reason: head?.reason ?? "empty" });
   }
 
   /** Assigns seq and hash now (deterministic order); the disk write happens on the next tick. */
@@ -76,7 +89,8 @@ export class AuditWriter {
     if (statSync(this.path).size < this.maxBytes) return;
     this.sync();
     closeSync(this.fd);
-    renameSync(this.path, join(this.path, "..", `audit-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`));
+    // The seq in the name keeps names unique (two rotations in one millisecond) and in chain order.
+    renameSync(this.path, join(dirname(this.path), rotatedName(this.seq)));
     this.fd = openSync(this.path, "a");
   }
 

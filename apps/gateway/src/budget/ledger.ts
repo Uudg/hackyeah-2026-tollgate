@@ -8,6 +8,7 @@ type Kind = keyof typeof SIZE;
 const KINDS = Object.keys(SIZE) as Kind[];
 
 export interface Usage { requests: number; tokens_in: number; tokens_out: number; usd: number; compute_ms: number }
+export interface Reservation { atS: number; estimate: Usage }
 export interface Exceeded { ruleId: string; retryAfterS: number; used: number; limit: number }
 
 const windowStart = (kind: Kind, nowS: number) => Math.floor(nowS / SIZE[kind]) * SIZE[kind];
@@ -36,16 +37,40 @@ export class Ledger {
     return null;
   }
 
-  commit(agentId: string, u: Usage): void {
-    const nowS = Date.now() / 1000;
+  /**
+   * Add usage to the agent's minute/hour/day windows. `atS` pins the windows (seconds); a settle uses the
+   * reservation's time so the correction lands in the same windows as the reservation.
+   */
+  commit(agentId: string, u: Usage, atS = Date.now() / 1000): void {
     const q = this.db.query(`INSERT INTO usage_windows (agent_id, kind, window_start, requests, tokens_in, tokens_out, usd, compute_ms)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (agent_id, kind, window_start) DO UPDATE SET requests = requests + excluded.requests,
         tokens_in = tokens_in + excluded.tokens_in, tokens_out = tokens_out + excluded.tokens_out,
         usd = usd + excluded.usd, compute_ms = compute_ms + excluded.compute_ms`);
     this.db.transaction(() => {
-      for (const kind of KINDS) q.run(agentId, kind, windowStart(kind, nowS), u.requests, u.tokens_in, u.tokens_out, u.usd, Math.round(u.compute_ms));
+      for (const kind of KINDS) q.run(agentId, kind, windowStart(kind, atS), u.requests, u.tokens_in, u.tokens_out, u.usd, Math.round(u.compute_ms));
     })();
+  }
+
+  /**
+   * Book the pre-check estimate right away. The caller runs it in the same synchronous step as precheck(), so
+   * concurrent requests see each other: without it every request in flight passed the same pre-check.
+   */
+  reserve(agentId: string, estimate: Usage): Reservation {
+    const atS = Date.now() / 1000;
+    this.commit(agentId, estimate, atS);
+    return { atS, estimate };
+  }
+
+  /** Replace a reservation with what the request really used (actual − estimate, in the reservation's windows). */
+  settle(agentId: string, r: Reservation, actual: Usage): void {
+    const e = r.estimate;
+    const delta: Usage = {
+      requests: actual.requests - e.requests, tokens_in: actual.tokens_in - e.tokens_in, tokens_out: actual.tokens_out - e.tokens_out,
+      usd: actual.usd - e.usd, compute_ms: Math.round(actual.compute_ms) - Math.round(e.compute_ms),
+    };
+    if (Object.values(delta).every((v) => v === 0)) return;
+    this.commit(agentId, delta, r.atS);
   }
 
   /** Windows older than two days are dropped (called every 10 minutes). */

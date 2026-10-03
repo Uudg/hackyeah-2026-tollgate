@@ -2,10 +2,10 @@
 // detector never claims a span an earlier one already took (a card number is not also a phone number).
 import type { PiiEntity } from "@tollgate/policy";
 import { makeHit, overlaps, type Action, type Hit } from "../types.ts";
-import { IBAN_RE, ibanMatchLength } from "./iban.ts";
+import { IBAN_RE, ibanMatchLength, NRB_RE, nrbMatchLength } from "./iban.ts";
 import { CARD_RE, cardValid } from "./card.ts";
 import { PESEL_RE, peselValid } from "./pesel.ts";
-import { EMAIL_RE } from "./email.ts";
+import { EMAIL_RE, EMAIL_OBFUSCATED_RE } from "./email.ts";
 import { PHONE_RE, phoneValid, IP_RE, ipValid } from "./phone.ts";
 
 export { ibanValid } from "./iban.ts";
@@ -17,9 +17,11 @@ const all = (ok: (m: string) => boolean) => (m: string) => (ok(m) ? m.length : 0
 
 const DETECTORS: Detector[] = [
   { entity: "iban", re: IBAN_RE, accept: ibanMatchLength },
+  { entity: "iban", re: NRB_RE, accept: nrbMatchLength },
   { entity: "card", re: CARD_RE, accept: all(cardValid) },
   { entity: "pesel", re: PESEL_RE, accept: all(peselValid) },
   { entity: "email", re: EMAIL_RE, accept: all(() => true) },
+  { entity: "email", re: EMAIL_OBFUSCATED_RE, accept: all(() => true) },
   { entity: "phone", re: PHONE_RE, accept: all(phoneValid) },
   { entity: "ip", re: IP_RE, accept: all(ipValid) },
 ];

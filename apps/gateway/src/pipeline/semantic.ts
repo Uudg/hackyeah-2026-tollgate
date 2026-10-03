@@ -86,7 +86,8 @@ export async function runSemantic(text: string, policy: Policy, provider: Semant
   // Llama Guard has no injection category, so "unsafe" in a category the policy does not list is a soft signal
   // for the judge, not an injection verdict. With a jailbreak model configured the score is a real vote.
   const guardOnly = c.categories.length > 0 && !s.jailbreak_model;
-  if (pi.enabled && c.parsed && c.score >= pi.threshold && !guardOnly) {
+  // score > 0: a "safe" verdict scores 0 and must not block even when the policy sets threshold: 0.
+  if (pi.enabled && c.parsed && c.score > 0 && c.score >= pi.threshold && !guardOnly) {
     out.hits.push({ hit: { controlId: "prompt_injection", ruleId: "inject.classifier", action: pi.action, owasp: ["LLM01", "ASI01"], details: { score: c.score, categories: c.categories } }, tier: 1 });
     return out;
   }

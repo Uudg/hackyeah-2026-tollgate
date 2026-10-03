@@ -128,8 +128,12 @@ export function adminRoutes(ctx: Ctx, policyPath: string, redteam: RedteamRunner
 
   // Killed sessions.
   app.get("/sessions/killed", (c) => c.json({ items: ctx.db.query("SELECT session_id, agent_id, ts, reason, event_id FROM killed_sessions ORDER BY ts DESC").all() }));
+  // Sessions are killed per agent; ?agent=<id> restores only that agent's session, without it every agent's row goes.
   app.delete("/sessions/killed/:sessionId", (c) => {
-    const r = ctx.db.query("DELETE FROM killed_sessions WHERE session_id = ?").run(c.req.param("sessionId"));
+    const agent = c.req.query("agent");
+    const r = agent
+      ? ctx.db.query("DELETE FROM killed_sessions WHERE session_id = ? AND agent_id = ?").run(c.req.param("sessionId"), agent)
+      : ctx.db.query("DELETE FROM killed_sessions WHERE session_id = ?").run(c.req.param("sessionId"));
     return c.json({ ok: r.changes > 0 });
   });
 

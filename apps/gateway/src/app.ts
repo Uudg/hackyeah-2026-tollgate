@@ -61,7 +61,14 @@ export function createGateway(opts: GatewayOptions): Gateway {
   let lastRaw = "";
   let ctxRef: Ctx | null = null;
 
-  const policyStore: FileStore<Policy> = createFileStore(opts.policyPath, (raw) => { lastRaw = raw; return parsePolicyText(raw); }, {
+  const policyStore: FileStore<Policy> = createFileStore(opts.policyPath, (raw) => {
+    lastRaw = raw;
+    const parsed = parsePolicyText(raw);
+    // A valid file clears the last rejection even when it is byte-identical in meaning to the policy in force
+    // (a bad save reverted): the store then skips onLoaded because the hash did not change.
+    if (parsed.ok && ctxRef) ctxRef.state.lastRejected = null;
+    return parsed;
+  }, {
     onLoaded: (next, prev, changed) => {
       db.query("INSERT OR REPLACE INTO policy_versions (hash, declared_version, loaded_ts, changed_paths, raw_yaml) VALUES (?, ?, ?, ?, ?)")
         .run(next.hash, next.value.version, next.loadedAt, JSON.stringify(changed), next.raw);

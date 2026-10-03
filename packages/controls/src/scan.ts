@@ -2,13 +2,14 @@
 // the compiled feed and the canary list; nothing here touches the network, disk or a clock.
 import { SEVERITY, type Action, type Hit, type Policy } from "@tollgate/policy";
 import { applyRedactions, excerpt, remaskExcerpts, type CanaryToken } from "./types.ts";
-import { normalize, decodeVariants } from "./normalize/index.ts";
+import { normalize, decodeVariants, NON_LITERAL, stripInvisible, stripStrayMarks } from "./normalize/index.ts";
 import { scanPii } from "./pii/index.ts";
 import { scanSecrets } from "./secrets/index.ts";
 import { scanInjection } from "./inject/heuristics.ts";
 import { scanPickle, scanSignatures, type CompiledFeed } from "./signatures/index.ts";
 import { scanCanaries } from "./canary.ts";
 import { scanLinks } from "./linkExfil.ts";
+import { spoofedHosts } from "./urls.ts";
 import { scanSysprompt } from "./sysprompt.ts";
 
 export interface ScanEnv {
@@ -75,13 +76,13 @@ export function scanRequestField(text: string, role: Role, field: string, env: S
     const d = decodeVariants(n.text, c.decode.max_depth);
     decodeTruncated = d.truncated;
     for (const v of d.variants) {
-      for (const inner of scanVariant(v.text, v.encoding !== "leet")) {
+      for (const inner of scanVariant(v.text, !NON_LITERAL.has(v.encoding))) {
         // A hit hidden inside an encoding is reported as decode.rescan, with the inner rule's action.
         hits.push({
           controlId: "decode", ruleId: "decode.rescan", action: inner.action, owasp: union(inner.owasp, ["LLM01"]),
           span: { start: v.rootStart, end: v.rootEnd, field },
           excerptRedacted: excerpt(n.text, v.rootStart, v.rootEnd, "encoded"),
-          details: { innerRuleId: inner.ruleId, innerControlId: inner.controlId, encoding: v.encoding, depth: v.depth, mask: "encoded" },
+          details: { innerRuleId: inner.ruleId, innerControlId: inner.controlId, encoding: v.encoding, depth: v.depth, mask: "encoded", ...(inner.details?.canary ? { canary: inner.details.canary } : {}) },
         });
       }
     }
@@ -117,9 +118,38 @@ export function scanOutputField(text: string, field: string, env: ScanEnv, o: Ou
   if (c.pii.enabled) hits.push(...scanPii(t, { entities: c.pii.entities, action: c.pii.action, field, owasp: union(["LLM02"], extraOwasp) }));
   const canaryRule = o.surface === "tool_call" ? "canaries.in_tool_call" : "canaries.in_output";
   if (c.canaries.enabled) hits.push(...scanCanaries(t, env.canaries, { rule: canaryRule, action: c.canaries.action, field, extraOwasp }));
+  // An encoded secret, PII value or canary in the output is still a leak (red-team finding): decode and rescan, and
+  // redact (or kill, for a canary) the whole encoded span. Non-literal rewrites (leetspeak, rot13...) only invent values,
+  // so they are rescanned for a system-prompt leak only: that needs a long run of the real prompt's words.
+  if (c.decode.enabled && c.decode.max_depth > 0) {
+    for (const v of decodeVariants(t, c.decode.max_depth).variants) {
+      const inner: Hit[] = [];
+      if (o.surface === "response" && c.sysprompt.enabled && o.system) inner.push(...scanSysprompt(o.system, v.text, { action: c.sysprompt.action, ngram: c.sysprompt.ngram, overlapThreshold: c.sysprompt.overlap_threshold, minRun: c.sysprompt.min_run, field }));
+      if (!NON_LITERAL.has(v.encoding)) {
+        if (c.secrets.enabled) inner.push(...scanSecrets(v.text, { action: secretAction, entropyMin: c.secrets.entropy_min, entropyMinLen: c.secrets.entropy_min_len, patterns: c.secrets.patterns, field, ignore, owasp: union(["LLM02"], extraOwasp) }));
+        if (c.pii.enabled) inner.push(...scanPii(v.text, { entities: c.pii.entities, action: c.pii.action, field, owasp: union(["LLM02"], extraOwasp) }));
+        if (c.canaries.enabled) inner.push(...scanCanaries(v.text, env.canaries, { rule: canaryRule, action: c.canaries.action, field, extraOwasp }));
+      }
+      for (const h of inner) {
+        hits.push({
+          controlId: "decode", ruleId: "decode.rescan", action: h.action, owasp: union(h.owasp, ["LLM02"]),
+          span: { start: v.rootStart, end: v.rootEnd, field },
+          excerptRedacted: excerpt(t, v.rootStart, v.rootEnd, "encoded"),
+          // An encoded canary still trips: noteCanaries reads details.canary.
+          details: { innerRuleId: h.ruleId, innerControlId: h.controlId, encoding: v.encoding, depth: v.depth, mask: "encoded", ...(h.details?.canary ? { canary: h.details.canary } : {}) },
+        });
+      }
+    }
+  }
   if (c.link_exfil.enabled) {
     const sensitive = hits.filter((h) => h.span).map((h) => h.span!);
-    hits.push(...scanLinks(t, { action: c.link_exfil.action, allowDomains: c.link_exfil.allow_domains, minQueryLen: c.link_exfil.min_query_len, blockImages: c.link_exfil.block_images, field, sensitive, extraOwasp }));
+    // Hosts are matched on the text before homoglyph folding: folding would turn "docs.exаmple.com" (Cyrillic а) into
+    // an allowlisted host. Folding is one code unit for one, so offsets are the same; if not, fall back to t.
+    const unfolded = stripStrayMarks(stripInvisible(text.normalize("NFKC")).text).text;
+    // Hosts that only exist because of the fold are never trusted, even on the fallback path.
+    const linkText = unfolded.length === t.length ? unfolded : t;
+    const spoofed = spoofedHosts(stripInvisible(text.normalize("NFKC")).text);
+    hits.push(...scanLinks(linkText, { action: c.link_exfil.action, allowDomains: c.link_exfil.allow_domains, minQueryLen: c.link_exfil.min_query_len, blockImages: c.link_exfil.block_images, field, sensitive, extraOwasp, spoofedHosts: spoofed }));
   }
   if (o.surface === "response" && c.sysprompt.enabled && o.system) {
     hits.push(...scanSysprompt(o.system, t, { action: c.sysprompt.action, ngram: c.sysprompt.ngram, overlapThreshold: c.sysprompt.overlap_threshold, minRun: c.sysprompt.min_run, field }));
@@ -142,6 +172,10 @@ export function scanOutputField(text: string, field: string, env: ScanEnv, o: Ou
     if (c.pii.enabled) extra.push(...scanPii(flat, { entities: c.pii.entities, action: c.pii.action, field, owasp: union(["LLM02"], extraOwasp) }));
     if (c.canaries.enabled) extra.push(...scanCanaries(flat, env.canaries, { rule: "canaries.in_tool_call", action: c.canaries.action, field, extraOwasp }));
     if (c.signatures.enabled && env.feed) extra.push(...scanSignatures(flat, env.feed, { scope: "tool_call", defaultAction: c.signatures.action, field, allowDomains: c.link_exfil.allow_domains, extraOwasp }));
+    // "https:\/\/collector.evil.io\/c?data=..." only reads as a link once unescaped; the system prompt pasted into an
+    // argument is a leak too (hardening findings).
+    if (c.link_exfil.enabled) extra.push(...scanLinks(flat, { action: c.link_exfil.action, allowDomains: c.link_exfil.allow_domains, minQueryLen: c.link_exfil.min_query_len, blockImages: c.link_exfil.block_images, field, sensitive: [], extraOwasp }));
+    if (c.sysprompt.enabled && o.system) extra.push(...scanSysprompt(o.system, flat, { action: c.sysprompt.action, ngram: c.sysprompt.ngram, overlapThreshold: c.sysprompt.overlap_threshold, minRun: c.sysprompt.min_run, field }));
     for (const h of extra) {
       if (seen.has(h.ruleId)) continue;
       // The span points into the unescaped text, not the raw JSON: a redact replaces the whole argument string.

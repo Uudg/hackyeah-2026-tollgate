@@ -1,5 +1,6 @@
-// Payment cards: 13–19 digits, Luhn, issuer prefix 3/4/5/6 (SPEC §7.1).
-export const CARD_RE = /\b(?:\d[ -]?){12,18}\d\b/g;
+// Payment cards: 13–19 digits, Luhn, issuer prefix 3/4/5/6 or Mastercard's 2221–2720 range (SPEC §7.1).
+// Digit groups may be split by spaces, dashes or dots ("4111.1111.1111.1111").
+export const CARD_RE = /\b(?:\d[ .-]?){12,18}\d\b/g;
 
 export function luhnValid(digits: string): boolean {
   let sum = 0;
@@ -13,5 +14,5 @@ export function luhnValid(digits: string): boolean {
 
 export function cardValid(m: string): boolean {
   const d = m.replace(/\D/g, "");
-  return d.length >= 13 && d.length <= 19 && /^[3-6]/.test(d) && luhnValid(d);
+  return d.length >= 13 && d.length <= 19 && /^(?:[3-6]|2[2-7])/.test(d) && luhnValid(d);
 }

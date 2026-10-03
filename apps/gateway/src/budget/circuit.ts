@@ -19,14 +19,27 @@ export class CircuitBreaker {
     this.onChange(host, state);
   }
 
-  /** null = request may go through; otherwise seconds until the next probe. */
-  allow(host: string, openForMs: number): number | null {
+  /**
+   * Stage 2, fail fast: null = the request may go on; otherwise seconds until the next probe. Moves open → half-open
+   * once openForMs has passed, but does not take the probe slot: a request blocked later (tier 0, budget, dry run)
+   * never reaches the upstream and would otherwise hold the slot forever.
+   */
+  check(host: string, openForMs: number): number | null {
     const h = this.get(host);
     if (h.state === "closed") return null;
     const elapsed = Date.now() - h.openedAt;
     if (h.state === "open" && elapsed >= openForMs) this.set(host, h, "half_open");
-    if (h.state === "half_open" && !h.probing) { h.probing = true; return null; }
+    if (h.state === "half_open" && !h.probing) return null;
     return Math.max(1, Math.ceil((openForMs - elapsed) / 1000));
+  }
+
+  /** Right before the upstream call: same answer as check(), and in half-open the first caller takes the probe slot. */
+  claim(host: string, openForMs: number): number | null {
+    const retry = this.check(host, openForMs);
+    if (retry !== null) return retry;
+    const h = this.get(host);
+    if (h.state === "half_open") h.probing = true;
+    return null;
   }
 
   success(host: string): void {

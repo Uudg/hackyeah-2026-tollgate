@@ -166,10 +166,12 @@ export class RedteamRunner {
       .filter((id) => cfg.include_model_mutators || !MUTATORS.find((m) => m.id === id)?.model);
     const rngSeed = cfg.rng_seed ?? Math.floor(Math.random() * 2 ** 31);
     const rng = makeRng(rngSeed);
-    // Response seeds are model output: an encoded or multi-turn link never renders, so those chains prove nothing.
-    const fitsResponse = (chain: string[]) => chain.every((id) => id !== "multi_turn" && !mutatorById.get(id)?.encoding);
+    // Response seeds are model output: multi_turn makes no sense there, and an encoded link never renders, so
+    // encodings prove nothing for link_exfil. An encoded secret, PII value or system prompt is still a leak.
+    const fitsResponse = (seed: Seed, chain: string[]) =>
+      chain.every((id) => id !== "multi_turn" && !(seed.control === "link_exfil" && mutatorById.get(id)?.encoding));
     const work = seeds.flatMap((seed) => chains(ids, cfg.max_depth)
-      .filter((chain) => seed.direction !== "response" || fitsResponse(chain))
+      .filter((chain) => seed.direction !== "response" || fitsResponse(seed, chain))
       .map((chain) => ({ seed, chain })));
     for (let i = work.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [work[i], work[j]] = [work[j]!, work[i]!]; }
     const queue = work.slice(0, cfg.max_attempts);

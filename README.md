@@ -201,25 +201,26 @@ The run ends with a summary grouped by control and OWASP id. Current run (M1 Max
 ```
 control             pass  fail  skip   OWASP
 audit                  6     0     0   ASI03, LLM02, LLM05, LLM10
-auth                   5     0     0   ASI03, LLM06
-budget                11     0     0   ASI07, ASI08, LLM06, LLM10
-canaries               9     0     0   ASI02, ASI03, ASI06, LLM02, LLM07
-content_safety         3     0     0   LLM01
-decode                 4     0     0   ASI01, LLM01
-link_exfil             5     0     0   ASI01, LLM02, LLM05
-models                 5     0     0   ASI03, ASI04, LLM03
-pii                   15     0     0   LLM02, LLM05
-policy                10     0     0   ASI03, ASI06, LLM02, LLM03, LLM10
-prompt_injection      10     0     1   ASI01, ASI06, LLM01, LLM07     (1 skipped: model-backed)
-secrets               14     0     0   ASI02, LLM02
-signatures            20     0     0   ASI01..ASI05, LLM01..LLM05, LLM07
-sysprompt              3     0     0   LLM07
-tool_calls            14     0     0   ASI02, ASI05, ASI08, LLM02, LLM05, LLM06
-unicode                5     0     0   LLM01
-TOTAL  139 pass · 0 fail · 1 skip   in 2.4 s
+auth                   9     0     0   ASI03, LLM06
+budget                19     0     0   ASI07, ASI08, LLM06, LLM10
+canaries              16     0     0   ASI02, ASI03, ASI06, LLM02, LLM07
+content_safety        15     0     0   LLM01
+decode                20     0     0   ASI01, LLM01, LLM02
+link_exfil            15     0     0   ASI01, ASI02, LLM02, LLM05
+models                 9     0     0   ASI03, ASI04, LLM03
+pii                   31     0     0   LLM02, LLM05
+policy                12     0     0   ASI03, ASI06, LLM01, LLM02, LLM03, LLM10
+prompt_injection      92     0     1   ASI01, ASI06, LLM01, LLM07     (1 skipped: model-backed)
+secrets               25     0     0   ASI02, LLM01, LLM02
+signatures            38     0     0   ASI01..ASI05, LLM01..LLM05, LLM07
+sysprompt             15     0     0   ASI02, LLM02, LLM07
+tool_calls            21     0     0   ASI02, ASI05, ASI08, LLM02, LLM05, LLM06
+unicode               11     0     0   LLM01, LLM02
+TOTAL  354 pass · 0 fail · 1 skip   in 29.0 s
+known open bypasses (red-team backlog): 160   not run, not counted above; tests/cases/generated/*-open.yaml, run them with TOLLGATE_BACKLOG=1 bun test
 ```
 
-Whole `bun test`: 216 pass, 1 skip, 0 fail in ~5 s (fixtures plus the suites below and the controls unit tests).
+Whole `bun test`: 503 pass, 2 skip, 0 fail in ~35 s with Ollama up (fixtures plus the suites below and the controls unit tests). The 160 open red-team cases are reported on their own line and not counted.
 
 Also included: a hot-reload test (edits a temp policy and the feed, asserts the next request uses them), a policy-schema test (the three presets validate, misspelt keys are rejected), a mock-semantic test (tiers 1–2 and fail-open/closed without a model), an audit-chain tamper test, an admin-API shape test, and a latency test (tier-0 overhead vs calling the upstream directly).
 
@@ -231,23 +232,27 @@ bun run redteam --minutes 30 --control prompt_injection
 
 Mutates seed attacks (base64, hex, URL-encoding, leetspeak, homoglyphs, zero-width characters, case shuffle, role-play wrappers, markdown/JSON wrapping, payload splitting, prefix padding, multi-turn; translation and paraphrase only when a model is allowed) against the live policy as a dry-run agent. Every bypass is written to `tests/cases/generated/` as a failing case and shown in the dashboard with a bypass rate per control.
 
-Measured on the shipped `policy.yaml`, all 88 seeds, depth 1 (each mutator alone plus the unmutated seed), `rng_seed 1`, Llama Guard 1B + llama3.2:3b judge on, 4 workers on an M1 Max (~5 min per run):
+Measured on the shipped `policy.yaml`, all 88 seeds, depth 1 (each mutator alone plus the unmutated seed), `rng_seed 1`, Llama Guard 1B + llama3.2:3b judge on, 4 workers on an M1 Max (~5–8 min per run):
 
-| control | attempts | bypass rate before | after hardening |
-|---|---:|---:|---:|
-| prompt_injection | 364 | 31.9 % | 19.0 % |
-| content_safety | 126 | 21.4 % | 13.5 % |
-| signatures | 266 | 13.9 % | 12.4 % |
-| tool_calls | 126 | 34.1 % | 34.1 % |
-| sysprompt | 40 | 77.5 % | 22.5 % |
-| secrets | 66 | 7.6 % | 7.6 % |
-| link_exfil | 50 | 6.0 % | 6.0 % |
-| pii | 142 | 4.2 % | 4.2 % |
-| **total** | **1180** | **22.7 %** | **15.7 %** |
+| control | attempts | M7, first run | after M7 fixes | after hardening pass |
+|---|---:|---:|---:|---:|
+| prompt_injection | 364 | 31.9 % | 19.0 % | 14.8 % |
+| content_safety | 126 | 21.4 % | 13.5 % | 12.7 % |
+| signatures | 266 | 13.9 % | 12.4 % | 14.3 % |
+| tool_calls | 126 | 34.1 % | 34.1 % | 34.1 % |
+| sysprompt | 40 → 52 | 77.5 % | 22.5 % | 7.7 % |
+| secrets | 66 → 69 | 7.6 % | 7.6 % | 1.4 % |
+| link_exfil | 50 | 6.0 % | 6.0 % | 6.0 % |
+| pii | 142 → 151 | 4.2 % | 4.2 % | 0.7 % |
+| **total** | **1180 → 1204** | **22.7 %** | **15.7 %** | **13.3 %** |
 
-What the loop found and what changed (SPEC §16, D17–D20): leetspeak, split string fragments and payloads split over several user turns beat tier 0, so these are now decoded and rescanned; URL-encoding blinded the classifier, so tiers 1–2 now also read the decoded text; soft "show me your initial instructions" requests got through, so the prompt-leak signature was widened. The sysprompt "before" figure also includes a harness bug (the system prompt was shorter than the 20-word minimum), fixed in the runner.
+The attempt count grew because encoding mutators now also apply to response seeds (an encoded secret or system prompt in the reply is a leak, so those chains are real attacks). Tier 1/2 rows move by a few points between runs because the local models are not fully deterministic under load.
 
-Committed results: `tests/cases/generated/*-fixed.yaml` (50 former bypasses that now pass, kept as regression tests) and `*-open.yaml` (183 bypasses still open, each with a `skip:` reason so `bun test` stays green). The open ones are mostly paraphrase-level jailbreaks that the 1B classifier misses (115), request-side tool intents whose tool call would still be checked on the response path (43), and output values split into fragments or obfuscated character by character (20), plus 5 values split across user turns. Remove a `skip:` line to turn a case into a regression test once a fix lands.
+What the loop found and what changed:
+- M7 (SPEC §16, D17–D20): leetspeak, split string fragments and payloads split over several user turns beat tier 0, so these are now decoded and rescanned; URL-encoding blinded the classifier, so tiers 1–2 now also read the decoded text; soft "show me your initial instructions" requests got through, so the prompt-leak signature was widened. The sysprompt "before" figure also includes a harness bug (the system prompt was shorter than the 20-word minimum), fixed in the runner.
+- Hardening pass (D23–D27): output-side decode-and-rescan for secrets, PII, canaries and the system prompt; case-insensitive IBAN and AWS keys; PII and secrets on joined user turns; 30+ input-format and normalization fixes; two new injection heuristics and wider feed entries; output-path fixes for links, tool names and extra message fields. An adversarial review then found five quadratic regexes (one 40 kB field froze the gateway for seconds) and several false positives; all fixed with tests (`tests/hardening-review.test.ts`).
+
+Committed results in `tests/cases/generated/`: two `*-fixed.yaml` files (50 + 33 former bypasses that now pass, kept as regression tests) and one `*-open.yaml` (160 bypasses still open, each with a `skip:` reason). The open cases are not counted in the `bun test` totals: the summary prints them on their own line, and `TOLLGATE_BACKLOG=1 bun test` runs them. They are mostly paraphrase-level jailbreaks the 1B classifier misses (105), request-side tool intents whose tool call would still be checked on the response path (43), and output values split into fragments or obfuscated character by character (12). Remove a `skip:` line to turn a case into a regression test once a fix lands.
 
 ---
 
@@ -347,6 +352,10 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 - Budgets are tracked in a single SQLite file; horizontal scale needs a shared store (the ledger interface is one file).
 - Model-file scanning (`POST /admin/scan/model`) covers the documented incident patterns, not arbitrary payloads, and is a stretch item. ModelScan or a sandboxed loader is the production answer.
 - A generic MCP transport proxy and manifest pinning (rug-pull detection) are stretch items; tool definitions and tool calls inside chat completions are governed.
+- `kill_session` is keyed by (agent, session id). An agent that sends a fresh `X-Session-Id` after a kill gets a new session; the agent itself is not frozen. Revoke the agent key (or set its budget to 0) to stop a compromised agent.
+- Character-level obfuscation of a value in the model's reply (a secret written letter by letter with spaces, a split IBAN) is only partly caught: output decode-and-rescan covers encodings and case changes, not arbitrary re-spelling. These stay in the red-team backlog.
+- The feed entry `generic-tool-call-internal-host` blocks any `file://`, `gopher://` or `dict://` URL in tool-call arguments. An agent that legitimately reads local files through a URL needs that entry's action set to `allow` (or the entry disabled) in its policy.
+- Tier 0 joins the user turns without a separator to catch values split across turns, so digits at the end of one turn and the start of the next can form a card or IBAN by chance. That conversation then stays blocked; start a new one.
 - Not covered: LLM08, LLM09, ASI09 (see coverage table).
 - Single node; no HA. The hash-chained audit log is tamper-evident, not tamper-proof (an attacker with write access to the host can rewrite the whole chain — ship the head hash off-host).
 

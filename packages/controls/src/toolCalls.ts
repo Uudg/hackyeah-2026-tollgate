@@ -1,5 +1,7 @@
 // Tool-call gating (SPEC §7.5). Request side: tool definitions. Response side: each tool call the model made.
 import { globMatch, type Action, type Hit } from "./types.ts";
+import { foldHomoglyphs } from "./normalize/homoglyphs.ts";
+import { stripInvisible } from "./normalize/invisible.ts";
 
 export interface ToolCallsConfig {
   action: Action;
@@ -13,9 +15,22 @@ const hit = (ruleId: string, action: Action, owasp: string[], field: string, det
   controlId: "tool_calls", ruleId, action, owasp, span: { start: 0, end: 0, field }, details,
 });
 
+/** OpenAI's own rule for function names. Anything else ("shell ", "ѕhell" with a Cyrillic ѕ) is a policy-evasion attempt. */
+export const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The name the deny / allow / approval globs see: NFKC, invisible characters removed, homoglyphs folded, trimmed. */
+export function canonicalToolName(name: string): string {
+  return foldHomoglyphs(stripInvisible(name.normalize("NFKC")).text).text.trim();
+}
+
+const matchesAny = (globs: readonly string[], name: string) => globs.some((p) => globMatch(p, name));
+
 export interface DefinitionCheck { hits: Hit[]; keep: boolean[] }
 
-/** definition_invalid (block) and denied_definition (removed from the forwarded request). */
+/**
+ * definition_invalid (block) and denied_definition (removed from the forwarded request). The deny globs see the
+ * canonical name first, so a lookalike of a denied tool is removed (redact); any other name outside TOOL_NAME blocks.
+ */
 export function checkToolDefinitions(tools: readonly unknown[], cfg: ToolCallsConfig): DefinitionCheck {
   const hits: Hit[] = [];
   const keep = tools.map((t, i) => {
@@ -26,8 +41,12 @@ export function checkToolDefinitions(tools: readonly unknown[], cfg: ToolCallsCo
       hits.push(hit("tool_calls.definition_invalid", "block", ["LLM06"], `tools[${i}]`, { type: def?.type ?? null }));
       return false;
     }
-    if (cfg.deny.some((p) => globMatch(p, fn.name as string))) {
+    if (matchesAny(cfg.deny, canonicalToolName(fn.name))) {
       hits.push(hit("tool_calls.denied_definition", "redact", ["LLM06", "ASI02"], `tools[${i}]`, { toolName: fn.name }));
+      return false;
+    }
+    if (!TOOL_NAME.test(fn.name)) {
+      hits.push(hit("tool_calls.definition_invalid", "block", ["LLM06"], `tools[${i}]`, { toolName: fn.name, reason: "name outside [A-Za-z0-9_-]{1,64}" }));
       return false;
     }
     return true;
@@ -63,26 +82,46 @@ export function checkToolCall(call: ToolCall, index: number, declared: Map<strin
     args = null; // not JSON: reported as tool_calls.schema below
   }
   const fail = (reason: string) => ({ hits: [hit("tool_calls.schema", cfg.action, schemaOwasp, field, { toolName: name, reason })], args, needsApproval: false });
+  // A lookalike name ("send_email ", "ѕhell") is refused before anything else; the globs below see the canonical name.
+  if (!TOOL_NAME.test(name)) return fail("tool name outside [A-Za-z0-9_-]{1,64}");
+  const canonical = canonicalToolName(name);
   const required = declared.get(name);
   if (required === undefined) return fail("tool not declared in the request");
   if (args === null) return fail("arguments are not a JSON object");
   if (new TextEncoder().encode(raw).length > cfg.max_arguments_bytes) return fail(`arguments larger than ${cfg.max_arguments_bytes} bytes`);
   const missing = required.filter((k) => !(k in args!));
   if (missing.length) return fail(`missing required argument(s): ${missing.join(", ")}`);
-  if (cfg.deny.some((p) => globMatch(p, name)) || !cfg.allow.some((p) => globMatch(p, name))) {
+  if (matchesAny(cfg.deny, canonical) || !matchesAny(cfg.allow, canonical)) {
     return { hits: [hit("tool_calls.denied", cfg.action, ["LLM06", "ASI02"], field, { toolName: name })], args, needsApproval: false };
   }
-  return { hits: [], args, needsApproval: cfg.require_approval.some((p) => globMatch(p, name)) };
+  return { hits: [], args, needsApproval: matchesAny(cfg.require_approval, canonical) };
 }
 
-/** Every string value inside parsed arguments, joined: scanned in addition to the raw JSON (escapes removed). */
+/** A string that is itself a JSON object or array, parsed; undefined for any other string. */
+function nestedJson(s: string): object | undefined {
+  if (!/^\s*[[{]/.test(s)) return undefined;
+  try {
+    const v: unknown = JSON.parse(s);
+    return v && typeof v === "object" ? v : undefined;
+  } catch {
+    return undefined; // looks like JSON but is not: the string itself was already collected
+  }
+}
+
+/**
+ * Every string value inside parsed arguments, joined: scanned in addition to the raw JSON (escapes removed).
+ * A value that is itself JSON ('{"note":"\\u0074gc_..."}') is parsed and walked too, up to 3 levels deep.
+ */
 export function argumentStrings(args: unknown): string {
   const out: string[] = [];
-  const walk = (v: unknown) => {
-    if (typeof v === "string") out.push(v);
-    else if (Array.isArray(v)) v.forEach(walk);
-    else if (v && typeof v === "object") Object.values(v).forEach(walk);
+  const walk = (v: unknown, depth: number) => {
+    if (typeof v === "string") {
+      out.push(v);
+      const inner = depth < 3 ? nestedJson(v) : undefined;
+      if (inner) walk(inner, depth + 1);
+    } else if (Array.isArray(v)) v.forEach((x) => walk(x, depth));
+    else if (v && typeof v === "object") Object.values(v).forEach((x) => walk(x, depth));
   };
-  walk(args);
+  walk(args, 0);
   return out.join("\n");
 }

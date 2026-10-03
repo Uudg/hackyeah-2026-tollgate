@@ -23,8 +23,11 @@ CREATE TABLE IF NOT EXISTS request_hashes (
 );
 CREATE INDEX IF NOT EXISTS request_hashes_idx ON request_hashes(agent_id, hash, ts);
 
+-- Keyed per agent: X-Session-Id is chosen by the client, so one agent must not be able to kill another's session.
+-- Data dirs created before this key are migrated by openDb() (db/client.ts).
 CREATE TABLE IF NOT EXISTS killed_sessions (
-  session_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, ts TEXT NOT NULL, reason TEXT NOT NULL, event_id TEXT
+  agent_id TEXT NOT NULL, session_id TEXT NOT NULL, ts TEXT NOT NULL, reason TEXT NOT NULL, event_id TEXT,
+  PRIMARY KEY (agent_id, session_id)
 );
 
 CREATE TABLE IF NOT EXISTS approvals (

@@ -1,7 +1,7 @@
 // Secret detection (SPEC §7.1): rule ids secrets.<name>, OWASP LLM02.
 import { makeHit, overlaps, type Action, type Hit } from "../types.ts";
 import { SECRET_PATTERNS, customPatterns } from "./patterns.ts";
-import { judgeToken, tokenRegex } from "./entropy.ts";
+import { judgeToken, publicBlockSpans, tokenRegex } from "./entropy.ts";
 
 export { SECRET_PATTERNS } from "./patterns.ts";
 export { shannon } from "./entropy.ts";
@@ -35,9 +35,10 @@ export function scanSecrets(text: string, o: SecretsOptions): Hit[] {
       add(name, start, end, o.action);
     }
   }
+  const publicBlocks = publicBlockSpans(text);
   for (const m of text.matchAll(tokenRegex(o.entropyMinLen))) {
     const start = m.index!, end = start + m[0].length;
-    if (overlaps(taken, start, end) || ignored(m[0])) continue;
+    if (overlaps(taken, start, end) || overlaps(publicBlocks, start, end) || ignored(m[0])) continue;
     const v = judgeToken(m[0], text.slice(Math.max(0, start - 300), start), o.entropyMin);
     if (!v.secret) continue;
     add("high_entropy", start, end, o.action, { entropy: Number(v.entropy.toFixed(2)) });

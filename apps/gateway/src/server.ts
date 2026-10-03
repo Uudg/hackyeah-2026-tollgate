@@ -20,7 +20,8 @@ try {
 }
 
 const port = Number(process.env.TOLLGATE_PORT ?? 8787);
-const server = Bun.serve({ port, fetch: gateway.app.fetch, idleTimeout: 0 });
+// 4 MB body cap (Bun's default is 128 MB): every field is scanned synchronously, so the cap bounds the work per request.
+const server = Bun.serve({ port, fetch: gateway.app.fetch, idleTimeout: 0, maxRequestBodySize: 4 * 1024 * 1024 });
 const p = gateway.getPolicy();
 log("info", "tollgate gateway listening", {
   url: `http://localhost:${server.port}`, policy: p.hash, mode: p.value.mode,

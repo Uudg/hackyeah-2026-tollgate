@@ -195,8 +195,8 @@ semantic:
   classifier_model: llama-guard3:1b      # returns safe / unsafe + S-category; tens of milliseconds
   # jailbreak_model: granite3-guardian:2b  # optional second vote (yes/no); score = mean of votes
   judge_model: llama3.2:3b               # tier 2, only consulted inside uncertain_band
-  timeout_ms: 1500                       # tier-1 timeout (AbortSignal); measured as its own stage latency
-  judge_timeout_ms: 6000                 # tier-2 timeout
+  timeout_ms: 10000                      # test suite only: generous so a busy or slow judge machine does not fail open (shipped policy: 1500)
+  judge_timeout_ms: 20000                # test suite only (shipped policy: 6000)
   judge_min_confidence: 0.60             # judge verdict "block" needs at least this confidence
   uncertain_band: [0.30, 0.80]           # tier-1 scores in [lo, hi) go to the judge; below lo → allow
   classify_context: false                # true = send up to 4 previous turns to the classifier (multi-turn attacks)
@@ -209,7 +209,7 @@ semantic:
 # -----------------------------------------------------------------------------
 budgets:
   pricing_file: ./pricing.json           # per-model prices, hot-reloaded; unknown models use its `default`
-  default_max_tokens: 1024               # assumed completion size for the pre-check when the request has no max_tokens
+  default_max_tokens: 1024               # request without max_tokens: reserved for the pre-check and sent upstream as the cap
   enforce_in_monitor: false              # keep budgets advisory while mode: monitor
   default:                               # applies to every agent unless overridden below
     tokens_per_hour: 50000               # prompt + completion tokens

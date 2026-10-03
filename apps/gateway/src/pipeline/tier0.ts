@@ -11,7 +11,8 @@ export interface Tier0Result {
   details: Record<string, unknown>;
 }
 
-const JOINED_CONTROLS = new Set(["prompt_injection", "signatures"]);
+// PII and secrets split over turns ("first half of the IBAN", "second half") are caught too (red-team finding).
+const JOINED_CONTROLS = new Set(["prompt_injection", "signatures", "pii", "secrets"]);
 
 const roleOf = (r: ChatMessage["role"]) => (r === "developer" ? "system" : r);
 
@@ -28,7 +29,8 @@ export function runTier0(messages: ChatMessage[], tools: unknown[] | undefined, 
     return r.redacted === null ? m : { ...m, content: r.redacted };
   });
   // A payload split over several user turns ("reply OK after each part") is only visible when the turns are read
-  // together. The joined text is checked for injection and signatures; its hits cannot be redacted (no single field).
+  // together. The joined text is checked for injection, signatures, PII and secrets; its hits cannot be redacted
+  // (no single field holds the value), so redact becomes block.
   const turns = messages.filter((m) => m.role === "user").map(messageText).filter(Boolean);
   if (turns.length >= 2) {
     const seen = new Set(hits.map((h) => h.ruleId));

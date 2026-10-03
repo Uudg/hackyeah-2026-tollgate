@@ -1,18 +1,38 @@
 // Canary tokens (SPEC §13): fake secrets whose appearance outside the system prompt proves a leak.
 import { makeHit, type Action, type CanaryToken, type Hit } from "./types.ts";
+import { squashText } from "./sysprompt.ts";
 
 export type CanaryRule = "canaries.in_input" | "canaries.in_output" | "canaries.in_tool_call";
 
-/** Exact substring match on normalized text (homoglyphed tokens are folded back before this runs). */
+/** A squashed token shorter than this is only matched exactly (a short custom token could occur by chance). */
+const MIN_SQUASHED = 12;
+
+/**
+ * Exact substring match on normalized text (homoglyphed tokens are folded back before this runs), then a squashed
+ * match: letters and digits only, case-insensitive, so "t g c _ S t a t i c…", "TGC-STATIC…" and a token split
+ * across joined argument values still match. Canaries are 20+ random characters, so this cannot fire by chance.
+ */
 export function scanCanaries(text: string, tokens: readonly CanaryToken[], o: { rule: CanaryRule; action: Action; field: string; extraOwasp?: string[] }): Hit[] {
   const hits: Hit[] = [];
+  let sq: ReturnType<typeof squashText> | null = null;
   for (const c of tokens) {
-    const at = text.indexOf(c.token);
-    if (at < 0) continue;
+    let start = text.indexOf(c.token);
+    let end = start + c.token.length;
+    let match = "exact";
+    if (start < 0) {
+      const tok = squashText(c.token).text;
+      if (tok.length < MIN_SQUASHED) continue;
+      sq ??= squashText(text);
+      const at = sq.text.indexOf(tok);
+      if (at < 0) continue;
+      start = sq.start[at]!;
+      end = sq.end[at + tok.length - 1]!;
+      match = "squashed";
+    }
     hits.push(makeHit({
       controlId: "canaries", ruleId: o.rule, action: o.action, owasp: [...new Set(["LLM02", "LLM07", "ASI06", ...(o.extraOwasp ?? [])])],
-      field: o.field, text, start: at, end: at + c.token.length, label: "canary",
-      details: { canary: { id: c.id, kind: c.kind, label: c.label } },
+      field: o.field, text, start, end, label: "canary",
+      details: { canary: { id: c.id, kind: c.kind, label: c.label }, match },
     }));
   }
   return hits;

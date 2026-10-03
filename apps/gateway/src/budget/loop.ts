@@ -2,8 +2,12 @@
 import { sha256 } from "@tollgate/policy/loader";
 import type { Db } from "../db/client.ts";
 
-export function requestHash(agentId: string, model: string, normalizedLastUser: string, toolNames: string[]): string {
-  const text = normalizedLastUser.toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * `normalizedLastInput` is the last user OR tool message: an agent working through tool steps keeps the same user
+ * turn but gets new tool results (not a loop); a stuck agent gets the same tool result again (a loop).
+ */
+export function requestHash(agentId: string, model: string, normalizedLastInput: string, toolNames: string[]): string {
+  const text = normalizedLastInput.toLowerCase().replace(/\s+/g, " ").trim();
   return sha256(`${agentId}|${model}|${text}|${sha256(JSON.stringify(toolNames))}`);
 }
 
