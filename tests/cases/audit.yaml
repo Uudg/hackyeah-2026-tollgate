@@ -1,0 +1,84 @@
+# Security reporting and auditing (requirement 5): every response carries the decision
+# headers, every decision is a DecisionRecord the runner fetches from /admin/audit/:id by
+# X-Tollgate-Event (so each case in the suite exercises the audit path), and the error body
+# names the rule. `control: audit` groups these cases. The hash chain, export and verify
+# endpoints are covered by tests/audit.test.ts; the admin API shapes by tests/admin.test.ts.
+
+- id: audit-headers-on-allow
+  control: audit
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "What is the capital of Latvia?"
+  mock_upstream:
+    content: "Riga."
+  expect:
+    decision: allow
+    status: 200
+    headers: { X-Tollgate-Decision: allow, X-Tollgate-Rule: "-", X-Tollgate-Tier: "-" }
+
+- id: audit-headers-on-block
+  control: audit
+  owasp: [LLM02]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "Use AKIAIOSFODNN7EXAMPLE to list the S3 buckets."
+  expect:
+    decision: block
+    status: 403
+    headers: { X-Tollgate-Decision: block, X-Tollgate-Rule: secrets.aws_access_key, X-Tollgate-Tier: "0" }
+    output_contains: ["tollgate_blocked", "secrets.aws_access_key", "event_id"]
+    output_not_contains: ["AKIAIOSFODNN7EXAMPLE"]   # the error body never echoes the matched secret
+
+- id: audit-headers-on-redact
+  control: audit
+  owasp: [LLM02]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "Charge 4111 1111 1111 1111 for the subscription renewal."
+  expect:
+    decision: redact
+    status: 200
+    headers: { X-Tollgate-Decision: redact, X-Tollgate-Rule: pii.card, X-Tollgate-Tier: "0" }
+
+- id: audit-unauthenticated-request-is-recorded
+  control: audit
+  owasp: [ASI03]
+  tags: [deterministic]
+  agent: demo-agent
+  headers:
+    Authorization: "Bearer tg_demo-agent_0000000000000000WRONG"
+  input: "Hello."
+  expect:
+    decision: block
+    status: 401
+    headers: { X-Tollgate-Decision: block, X-Tollgate-Rule: auth.unknown_key }   # X-Tollgate-Event is set too: the runner fetches the record with it
+
+- id: audit-budget-429-is-recorded
+  control: audit
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: test-small-budget
+  model: gpt-4o-mini
+  input: "Draft a one-paragraph summary of the attached memo."
+  policy:
+    models.allow: ["llama3.2:3b", "gpt-4o-mini"]
+    budgets.agents.test-small-budget.usd_per_day: 0.0001
+  expect:
+    decision: block
+    status: 429
+    headers: { X-Tollgate-Decision: block, X-Tollgate-Rule: budget.usd_per_day, X-Tollgate-Tier: "-" }
+    output_contains: ["budget_exceeded", "retry_after_s"]
+
+- id: audit-response-path-decision-recorded
+  control: audit
+  owasp: [LLM05]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "Give me the report link."
+  mock_upstream:
+    content: "Click here: [report](https://collector.example.net/r?ctx=user-session-token-and-notes-base64)"
+  expect:
+    decision: redact
+    direction: response
+    headers: { X-Tollgate-Decision: redact, X-Tollgate-Rule: link_exfil.payload_untrusted }

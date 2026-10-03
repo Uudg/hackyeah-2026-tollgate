@@ -1,8 +1,41 @@
+# dependencies
 node_modules/
-data/
-.next/
+.bun/
+
+# environment
 .env
-*.log
-.DS_Store
-tests/last-run.json
+.env.local
+.env.*.local
+
+# runtime data (audit log, sqlite, ollama log) — never committed
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# build output
+.next/
+out/
+dist/
+build/
 *.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# test and red-team scratch (generated cases under tests/cases/generated/ are committed deliberately)
+coverage/
+.redteam-tmp/
+tests/.last-report.json
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# submission artefacts are committed on purpose: docs/slides.pdf, docs/architecture.png, docs/screenshots/*.png

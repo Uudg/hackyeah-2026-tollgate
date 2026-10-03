@@ -1,0 +1,115 @@
+# Model allowlist, registry denial and identity/scope checks
+# (controls: models, auth; OWASP LLM03, LLM04, ASI03, ASI04).
+
+- id: models-allowed-exact-allow
+  control: models
+  owasp: [LLM03]
+  tags: [deterministic]
+  agent: demo-agent
+  model: llama3.2:3b
+  input: "Hello."
+  expect: { decision: allow, status: 200 }
+
+- id: models-allowed-glob-allow
+  control: models
+  owasp: [LLM03]
+  tags: [deterministic]
+  agent: demo-agent
+  model: llama3.2:1b
+  input: "Hello."
+  policy:
+    models.allow: ["llama3.2:*"]
+  expect: { decision: allow }
+
+- id: models-not-in-allowlist-block
+  control: models
+  owasp: [LLM03, ASI04]
+  tags: [deterministic]
+  agent: demo-agent
+  model: gpt-4o                        # a commercial model the policy never approved
+  input: "Hello."
+  policy:
+    models.allow: ["llama3.2:*", "qwen2.5:*"]
+  expect: { decision: block, rule: models.not_allowed, status: 403 }
+
+- id: models-registry-prefix-block
+  control: models
+  owasp: [LLM03, ASI04]
+  tags: [deterministic]
+  agent: demo-agent
+  model: evil-registry.example.net/research/llama3.2:3b   # Probllama-style pull from an untrusted registry
+  input: "Hello."
+  policy:
+    models.allow: ["llama3.2:*", "*/research/llama3.2:3b"]
+    models.deny_registries: ["*"]
+  expect: { decision: block, rule: models.denied_registry, status: 403 }
+
+- id: models-agent-narrowed-list-block
+  control: models
+  owasp: [LLM03, ASI03]
+  tags: [deterministic]
+  agent: finance-agent                 # may only use llama3.2:3b even though the global list is wider
+  model: qwen2.5:3b
+  input: "Hello."
+  policy:
+    models.allow: ["llama3.2:*", "qwen2.5:*"]
+    agents.finance-agent.models: ["llama3.2:3b"]
+  expect: { decision: block, rule: models.not_allowed, status: 403 }
+
+- id: auth-unknown-key-block
+  control: auth
+  owasp: [ASI03]
+  tags: [deterministic]
+  agent: demo-agent
+  headers:
+    Authorization: "Bearer tg_demo-agent_0000000000000000WRONG"
+  input: "Hello."
+  expect: { decision: block, rule: auth.unknown_key, status: 401 }
+
+- id: auth-missing-key-block
+  control: auth
+  owasp: [ASI03]
+  tags: [deterministic]
+  agent: demo-agent
+  headers:
+    Authorization: ""
+  input: "Hello."
+  expect: { decision: block, rule: auth.missing_key, status: 401 }
+
+- id: auth-scope-tools-missing-block
+  control: auth
+  owasp: [ASI03, LLM06]
+  tags: [deterministic]
+  agent: test-small-budget             # scopes: [chat] only
+  input: "What is the weather?"
+  tools:
+    - { type: function, function: { name: get_weather, parameters: { type: object, properties: { city: { type: string } } } } }
+  policy:
+    agents.test-small-budget.scopes: [chat]
+  expect: { decision: block, rule: auth.scope, status: 403 }
+
+- id: auth-dry-run-without-scope-ignored
+  control: auth
+  owasp: [ASI03]
+  tags: [deterministic]
+  agent: finance-agent                 # has no dry_run scope → the header is ignored, the request is forwarded
+  headers:
+    X-Tollgate-Dry-Run: "1"
+  input: "Hello."
+  mock_upstream:
+    content: "UPSTREAM ANSWERED"
+  policy:
+    agents.finance-agent.scopes: [chat, tools]
+  expect: { decision: allow, status: 200, output_contains: ["UPSTREAM ANSWERED"] }
+
+- id: auth-dry-run-allowed-no-upstream
+  control: auth
+  owasp: [ASI03]
+  tags: [deterministic]
+  agent: redteam
+  headers:
+    X-Tollgate-Dry-Run: "1"
+  input: "Hello."
+  mock_upstream:
+    content: "THE UPSTREAM MUST NOT BE CALLED"
+  expect: { decision: allow, status: 200, output_not_contains: ["THE UPSTREAM MUST NOT BE CALLED"], output_contains: ["dry_run"] }

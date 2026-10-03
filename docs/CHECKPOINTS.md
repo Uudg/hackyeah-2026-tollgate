@@ -1,5 +1,14 @@
 # Checkpoints
 
+## Realignment — planning pack v2 (Sat 3 Oct, ~17:30 CEST)
+- A new planning pack replaced CLAUDE.md, HANDOFF.md, docs/*, policy*.yaml, the feed, fixtures and seeds at 18:29 local. It makes docs/SPEC.md the contract.
+- The schema v1 freeze (tag `freeze`) is superseded. `packages/policy` now implements SPEC §3, §4.1, §6.1, §11.1, §12.1 exactly (schema v2): `schema.ts`, `decision.ts`, `feed.ts`, `testcase.ts`, `loader.ts`, `watch.ts`, `hash.ts`, `events.ts`.
+- Kept from v1: zod 4 strict objects, last-good file store, directory watch with 150 ms debounce.
+- Converted track D's 50 seeds to the SPEC seed format (`control`, `direction: request|response`); dropped docs/BEHAVIOUR.md (v1 names).
+- Fixed: root package.json had a `_comment` key inside `devDependencies`, which made `bun install` fail.
+- All shipped files validate: policy.yaml, policy.strict.yaml, policy.monitor.yaml, tests/policy.test.yaml, the 14-entry feed, 131 fixtures, 88 seeds.
+
+
 ## Checkpoint 1 — plan + schemas (Sat 3 Oct, ~17:00 CEST)
 
 ### State

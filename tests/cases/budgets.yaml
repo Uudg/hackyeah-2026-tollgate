@@ -1,0 +1,146 @@
+# Budget and resource governance (control: budget; OWASP LLM10, ASI08).
+# Agent `test-small-budget` has tokens_per_hour 3000, usd_per_day 0.01,
+# compute_seconds_per_hour 5, max_tool_depth 2, requests_per_minute 20 in
+# policy.yaml; the overrides below pin the values so the cases do not depend
+# on the test policy. Budget failures are HTTP 429 with Retry-After.
+
+- id: budget-within-limits-allow
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: test-small-budget
+  input: "ping"
+  expect: { decision: allow, status: 200 }
+
+- id: budget-tokens-per-hour-block
+  control: budget
+  owasp: [LLM10, ASI08]
+  tags: [deterministic]
+  agent: test-small-budget
+  repeat: 6                            # pre-check: committed tokens + estimate + default_max_tokens (300) > 400 on the 4th call
+  input: "Write a long essay about budgets, resource governance and why gateways need them."
+  policy:
+    budgets.default_max_tokens: 300
+    budgets.agents.test-small-budget.tokens_per_hour: 400
+    budgets.agents.test-small-budget.requests_per_minute: 100
+    budgets.loop_breaker.enabled: false
+  expect: { last_decision: block, last_rule: budget.tokens_per_hour, last_status: 429 }
+
+- id: budget-requests-per-minute-block
+  control: budget
+  owasp: [LLM10, ASI08]
+  tags: [deterministic]
+  agent: test-small-budget
+  repeat: 6
+  input: "status check"
+  policy:
+    budgets.agents.test-small-budget.requests_per_minute: 5
+    budgets.loop_breaker.enabled: false
+  expect: { last_decision: block, last_rule: budget.requests_per_minute, last_status: 429 }
+
+- id: budget-usd-per-day-block
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: test-small-budget
+  model: gpt-4o-mini                   # priced in pricing.json; the mock upstream answers for any model name
+  input: "Draft a one-paragraph summary of the attached memo."
+  policy:
+    models.allow: ["llama3.2:3b", "gpt-4o-mini"]
+    budgets.agents.test-small-budget.usd_per_day: 0.0001   # estimated cost of one call already exceeds it
+  expect: { decision: block, rule: budget.usd_per_day, status: 429 }
+
+- id: budget-local-model-zero-cost-allow
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: test-small-budget
+  model: llama3.2:3b                   # priced at 0 USD; the tiny usd budget does not apply
+  input: "Draft a one-paragraph summary of the attached memo."
+  policy:
+    budgets.agents.test-small-budget.usd_per_day: 0.0001
+  expect: { decision: allow, status: 200 }
+
+- id: budget-compute-seconds-block
+  control: budget
+  owasp: [LLM10, ASI08]
+  tags: [deterministic]
+  agent: test-small-budget
+  repeat: 2
+  input: "slow request"
+  mock_upstream:
+    content: "done"
+    delay_ms: 250                      # first call consumes 0.25 s of compute, over the 0.1 s limit
+  policy:
+    budgets.agents.test-small-budget.compute_seconds_per_hour: 0.1
+    budgets.loop_breaker.enabled: false
+  expect: { last_decision: block, last_rule: budget.compute_seconds_per_hour, last_status: 429 }
+
+- id: budget-loop-breaker-block
+  control: budget
+  owasp: [LLM10, ASI08]
+  tags: [deterministic]
+  agent: demo-agent
+  repeat: 6                            # max_repeats 5 → the 6th identical request trips the breaker
+  input: "retry the same thing again"
+  policy:
+    budgets.loop_breaker.enabled: true
+    budgets.loop_breaker.max_repeats: 5
+    budgets.loop_breaker.same_request_within: 30s
+    budgets.loop_breaker.action: block
+  expect: { last_decision: block, last_rule: budget.loop_breaker, last_status: 429 }
+
+- id: budget-loop-breaker-distinct-requests-allow
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: demo-agent
+  messages:
+    - { role: user, content: "A different question each time does not look like a loop: what is 2 + 2?" }
+  expect: { decision: allow }
+
+- id: budget-max-tool-depth-block
+  control: budget
+  owasp: [LLM06, ASI08]
+  tags: [deterministic]
+  agent: test-small-budget
+  messages:
+    - { role: user, content: "Keep calling the tool until it succeeds." }
+    - { role: assistant, content: null, tool_calls: [{ id: c1, type: function, function: { name: lookup, arguments: '{}' } }] }
+    - { role: tool, tool_call_id: c1, content: "not yet" }
+    - { role: assistant, content: null, tool_calls: [{ id: c2, type: function, function: { name: lookup, arguments: '{}' } }] }
+    - { role: tool, tool_call_id: c2, content: "not yet" }
+    - { role: assistant, content: null, tool_calls: [{ id: c3, type: function, function: { name: lookup, arguments: '{}' } }] }
+    - { role: tool, tool_call_id: c3, content: "not yet" }
+  tools:
+    - { type: function, function: { name: lookup, parameters: { type: object, properties: {} } } }
+  policy:
+    agents.test-small-budget.scopes: [chat, tools]
+    budgets.agents.test-small-budget.max_tool_depth: 2
+  expect: { decision: block, rule: budget.max_tool_depth, status: 429 }
+
+- id: budget-depth-header-honoured-block
+  control: budget
+  owasp: [ASI08, ASI07]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "Forwarded from another agent."
+  headers:
+    X-Tollgate-Depth: "9"              # an orchestrator reports the hop count of an agent→agent chain
+  policy:
+    budgets.default.max_tool_depth: 8
+  expect: { decision: block, rule: budget.max_tool_depth }
+
+- id: budget-monitor-mode-advisory-allow
+  control: budget
+  owasp: [LLM10]
+  tags: [deterministic]
+  agent: test-small-budget
+  model: gpt-4o-mini
+  input: "Draft a one-paragraph summary of the attached memo."
+  policy:
+    mode: monitor
+    budgets.enforce_in_monitor: false
+    models.allow: ["llama3.2:3b", "gpt-4o-mini"]
+    budgets.agents.test-small-budget.usd_per_day: 0.0001
+  expect: { status: 200 }              # over budget, but monitor mode only records it

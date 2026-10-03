@@ -1,0 +1,255 @@
+# =============================================================================
+# Tollgate TEST policy  —  ./tests/policy.test.yaml
+# =============================================================================
+# The policy the test suite boots the in-process gateway on (SPEC §11.2). Same
+# schema, agents, keys, controls and budgets as ./policy.yaml so that fixtures
+# written against one work against the other. Differences:
+#   - version: 1
+#   - semantic.enabled: false  → deterministic cases never touch Ollama; a case
+#     tagged `model` sets semantic.enabled: true through its `policy` override.
+# Per-case `policy` overrides (dotted paths) are applied on top of this file
+# and reverted after the case. Never point the gateway at ./policy.yaml in tests.
+# =============================================================================
+
+version: 1             # human-readable counter; bump it when you change something.
+                       # The gateway identifies policies by content hash, so forgetting
+                       # to bump it is harmless — the hash still changes.
+
+mode: enforce          # enforce: actions are applied.
+                       # monitor: every control runs and records its verdict (dashboard
+                       # shows "would block") but traffic passes through unchanged.
+                       # Budgets are only enforced in monitor mode if
+                       # budgets.enforce_in_monitor is true.
+
+# -----------------------------------------------------------------------------
+# Upstream: where clean traffic goes. Ollama exposes an OpenAI-compatible API.
+# -----------------------------------------------------------------------------
+upstream:
+  base_url: http://127.0.0.1:11434/v1   # any OpenAI-compatible endpoint
+  # api_key: ""                          # sent as Authorization to the upstream if set
+  timeout_ms: 60000                      # upstream failures feed the circuit breaker
+
+# -----------------------------------------------------------------------------
+# Agents: identity = bearer key. Key format tg_<agent>_<random>. Every request
+# must carry `Authorization: Bearer <key>`; unknown keys are blocked and audited
+# (rule auth.unknown_key, OWASP ASI03). Keys are plain text in this demo.
+# -----------------------------------------------------------------------------
+agents:
+  demo-agent:                            # the tool-using demo agent and the dashboard playground
+    key: tg_demo-agent_7f3kQ9mZp2xLw8Rv4Nb6
+    scopes: [chat, tools, dry_run]       # chat: /v1/chat/completions; tools: may send/receive tool calls;
+                                         # dry_run: may use X-Tollgate-Dry-Run (pipeline only, no upstream)
+    description: "General assistant for the hackathon demo; answers questions and can use the provided tools."
+    memory_namespace: demo               # memory/RAG namespace this agent may read; audited, never shared
+
+  research-bot:                          # permissive profile: reads a lot, calls no risky tools
+    key: tg_research-bot_Ym3dK8pQ2sT6vW9xA1bC
+    scopes: [chat, tools]
+    models: ["llama3.2:*", "qwen2.5:*"]  # narrows models.allow for this agent
+    description: "Summarises documents and web pages for analysts. Read-only."
+    memory_namespace: research
+
+  finance-agent:                         # strict profile: handles payments, one model, no dry runs
+    key: tg_finance-agent_Qz5wE8rT1yU4iO7pA2sD
+    scopes: [chat, tools]
+    models: ["llama3.2:3b"]              # exactly one approved model
+    description: "Prepares payment instructions for the treasury team. Must never reveal account data or send funds without approval."
+    memory_namespace: finance
+
+  test-small-budget:                     # used by tests/cases/budgets.yaml; budget is tiny (see budgets.agents)
+    key: tg_test-small-budget_Hj2kL5mN8pQ1rS4tV7wX
+    scopes: [chat]
+    description: "Test identity with a deliberately tiny budget."
+
+  redteam:                               # the Red Team Loop; dry_run only, never reaches the upstream
+    key: tg_redteam_Rt9uI2oP5aS8dF1gH4jK7l
+    scopes: [chat, tools, dry_run]
+    description: "Internal fuzzer identity."
+
+# -----------------------------------------------------------------------------
+# Models: allowlist (exact names or globs) and registry denial.
+# OWASP LLM03 / LLM04 (supply chain, poisoning), ASI04.
+# -----------------------------------------------------------------------------
+models:
+  allow:
+    - "llama3.2:3b"                      # demo agent + tier-2 judge
+    - "llama3.2:*"
+    - "qwen2.5:3b"                       # fallback demo model
+    - "qwen2.5:*"
+    - "llama-guard3:1b"                  # tier-1 classifier (the gateway calls it itself)
+    - "granite3-guardian:2b"             # optional jailbreak vote
+  deny_registries: ["*"]                 # a model name with a registry prefix (host/ns/name) is
+                                         # never allowed: pulls from untrusted registries were the
+                                         # Probllama (CVE-2024-37032) vector. "*" = every host.
+
+# -----------------------------------------------------------------------------
+# Controls. Each has `enabled` and `action`; some have thresholds.
+# Request path order: unicode → decode → secrets → pii → prompt_injection
+#   (heuristics) → signatures → canaries → [tier 1 classifier] → [tier 2 judge]
+# Response path order: secrets → pii → canaries → link_exfil → sysprompt →
+#   signatures → tool_calls
+# -----------------------------------------------------------------------------
+controls:
+
+  pii:                                   # OWASP LLM02 — rule ids pii.<entity>
+    enabled: true
+    action: redact                       # redact: the span becomes [REDACTED:iban] and the request continues.
+                                         # Set to block to reject any request containing PII (see policy.strict.yaml).
+    entities: [email, phone, iban, card, pesel]   # available: email, phone, iban, card, pesel, ip
+                                         # iban: mod-97 checked; card: Luhn checked; pesel: checksum + date checked
+    scan_system_prompt: true             # also scan the system message for PII
+
+  secrets:                               # OWASP LLM02 — rule ids secrets.<name>
+    enabled: true
+    action: block                        # on requests. Responses are always at least redacted.
+    entropy_min: 3.5                     # bits/char for the generic high-entropy token rule
+    entropy_min_len: 32                  # minimum token length for the entropy rule
+    patterns:                            # extra named regexes, "name=regex"; rule id secrets.custom.<name>
+      - "internal_token=\\bgs_int_[A-Za-z0-9]{24,}\\b"
+
+  unicode:                               # OWASP LLM01 — invisible characters and homoglyphs used to hide payloads
+    enabled: true
+    action: block
+    max_invisible: 3                     # zero-width / bidi / tag characters stripped before scanning;
+                                         # at or above this count the request is a hit (unicode.invisible)
+    max_homoglyphs: 3                    # Cyrillic/Greek/fullwidth lookalikes mapped to ASCII; at or
+                                         # above this count inside otherwise-ASCII text → unicode.homoglyph
+
+  decode:                                # decode-and-rescan: base64 / hex / url-encoded / HTML-entity blobs
+    enabled: true                        # are decoded and every control runs again on the plaintext.
+    action: block                        # only used if an inner rule has no action of its own
+    max_depth: 2                         # base64-inside-base64 is still found; 3 is the maximum
+
+  prompt_injection:                      # OWASP LLM01 / ASI01 — tier 0 heuristics + tier 1 classifier + tier 2 judge
+    enabled: true
+    action: block
+    threshold: 0.80                      # tier-1 score at or above which `action` applies (0..1).
+                                         # Lower = stricter. Scores inside semantic.uncertain_band go to the judge.
+    heuristics: true                     # the fixed regex list ("ignore previous instructions", "<|im_start|>system", ...)
+
+  content_safety:                        # Llama Guard 3 categories that are blocked outright
+    enabled: true
+    action: block
+    categories: [S1, S2, S9, S11]        # S1 violent crimes, S2 non-violent crimes, S9 indiscriminate weapons,
+                                         # S11 self-harm. Full list: S1–S14 (S14 = code interpreter abuse).
+
+  canaries:                              # fake secrets planted in system prompts / memory. Any appearance in
+    enabled: true                        # output, tool-call arguments or untrusted input is proof of a leak.
+    action: kill_session                 # no model, no false positives → the strongest action by default
+
+  link_exfil:                            # OWASP LLM05 / LLM02 — EchoLeak-style exfiltration through URLs in output
+    enabled: true
+    action: redact                       # the URL becomes [REDACTED:link]; markdown images are removed entirely
+    allow_domains:                       # suffix match. These hosts may receive data-bearing links/images.
+      - intranet.example.com
+      - docs.example.com
+      - github.com
+    min_query_len: 20                    # a non-allowlisted URL with a query string this long is a hit
+    block_images: true                   # any image to a non-allowlisted host is a hit (zero-click fetch)
+
+  sysprompt:                             # OWASP LLM07 — the response repeats the system prompt
+    enabled: true
+    action: redact                       # matching runs become [REDACTED:system_prompt]
+    ngram: 8                             # word n-gram size used for overlap
+    overlap_threshold: 0.20              # fraction of system-prompt n-grams present in the response
+    min_run: 12                          # or: this many consecutive shared words
+
+  tool_calls:                            # OWASP LLM06 / ASI02 / ASI05 — tool definitions in, tool calls out
+    enabled: true
+    action: block                        # for schema failures and denied tools
+    allow: ["*"]                         # globs on tool name; a call to a tool outside this list is blocked
+    deny: ["delete_*", "drop_*", "shell", "exec", "run_command"]   # never offered to the model, never executed
+    require_approval: ["send_email", "transfer_funds", "create_payment", "update_*"]
+                                         # matched calls wait in the approval queue (/approvals on the dashboard)
+    approval_timeout_ms: 30000           # unanswered approvals expire as block (tool_calls.approval_timeout)
+    max_arguments_bytes: 16384           # larger argument payloads are rejected
+    scan_descriptions: true              # run tool-description signatures (MCP tool poisoning) on tools[]
+
+  signatures:                            # historical-attack feed (requirement 4)
+    enabled: true
+    action: block                        # default for entries that carry no action of their own
+    feed: ./feeds/ai-exploits.json       # file path (watched) or http(s) URL (polled)
+    refresh: 60s                         # re-read / re-fetch interval
+    fail_mode: open                      # feed unreachable at startup: open = continue without signatures
+                                         # (recorded as sig.feed_unavailable), closed = block every request
+
+# -----------------------------------------------------------------------------
+# Semantic (AI-based) controls. Tier 1 = classifier, tier 2 = LLM judge.
+# All models are local Ollama models; no data leaves the machine.
+# -----------------------------------------------------------------------------
+semantic:
+  enabled: false                         # tests: tier 0 only; `model` cases override this to true
+  provider: local                        # local = Ollama. "jev" is reserved for a swappable cloud provider; not implemented.
+  fail_mode: open                        # classifier timeout or error: open = continue and record
+                                         # semantic.unavailable; closed = block. strict preset uses closed.
+  classifier_model: llama-guard3:1b      # returns safe / unsafe + S-category; tens of milliseconds
+  # jailbreak_model: granite3-guardian:2b  # optional second vote (yes/no); score = mean of votes
+  judge_model: llama3.2:3b               # tier 2, only consulted inside uncertain_band
+  timeout_ms: 1500                       # tier-1 timeout (AbortSignal); measured as its own stage latency
+  judge_timeout_ms: 6000                 # tier-2 timeout
+  judge_min_confidence: 0.60             # judge verdict "block" needs at least this confidence
+  uncertain_band: [0.30, 0.80]           # tier-1 scores in [lo, hi) go to the judge; below lo → allow
+  classify_context: false                # true = send up to 4 previous turns to the classifier (multi-turn attacks)
+  max_chars: 6000                        # text sent to the classifier is cut to this length
+
+# -----------------------------------------------------------------------------
+# Budgets and resource governance (requirement 3). OWASP LLM10 / ASI08.
+# Windows: minute / hour / day, per agent, stored in SQLite. Local models cost
+# 0 USD but still count tokens and compute seconds.
+# -----------------------------------------------------------------------------
+budgets:
+  pricing_file: ./pricing.json           # per-model prices, hot-reloaded; unknown models use its `default`
+  default_max_tokens: 1024               # assumed completion size for the pre-check when the request has no max_tokens
+  enforce_in_monitor: false              # keep budgets advisory while mode: monitor
+  default:                               # applies to every agent unless overridden below
+    tokens_per_hour: 50000               # prompt + completion tokens
+    usd_per_day: 2.00                    # from pricing.json; 0-priced local models never hit this
+    compute_seconds_per_hour: 600        # wall-clock seconds of model work (upstream + classifier + judge)
+    max_tool_depth: 8                    # tool-result messages in one request (agent→agent hops via X-Tollgate-Depth)
+    requests_per_minute: 120
+  agents:                                # partial overrides, merged over `default`
+    research-bot:
+      tokens_per_hour: 200000
+      compute_seconds_per_hour: 1800
+      requests_per_minute: 300
+    finance-agent:
+      tokens_per_hour: 20000
+      usd_per_day: 0.50
+      max_tool_depth: 4
+      requests_per_minute: 30
+    test-small-budget:                   # tests/cases/budgets.yaml exhausts this in a handful of requests
+      tokens_per_hour: 3000
+      usd_per_day: 0.01
+      compute_seconds_per_hour: 5
+      max_tool_depth: 2
+      requests_per_minute: 20
+    redteam:
+      tokens_per_hour: 5000000           # dry runs never reach the upstream, but tokens are still estimated
+      requests_per_minute: 2000
+  loop_breaker:                          # the same request (agent + model + normalized last user message + tools)
+    enabled: true                        # repeated too often = a stuck agent
+    same_request_within: 30s
+    max_repeats: 5                       # the 6th identical request inside the window is hit by budget.loop_breaker
+    action: block
+  circuit_breaker:                       # upstream failures: fail fast instead of piling up
+    enabled: true
+    failure_threshold: 5                 # failures inside `window` → open
+    window: 30s
+    open_for: 20s                        # then half-open: one probe request
+
+# -----------------------------------------------------------------------------
+# Canary secrets (see controls.canaries for the action)
+# -----------------------------------------------------------------------------
+canaries:
+  auto_generate: 3                       # generated on first start if the store is empty: aws_key, api_key, record
+  tokens:                                # extra static canaries (useful for tests and external agents)
+    - "tgc_StaticCanaryForDemo00001"
+    - "CANARY-RECORD-0badc0de"
+
+# -----------------------------------------------------------------------------
+# Telemetry
+# -----------------------------------------------------------------------------
+telemetry:
+  reservoir_size: 2000                   # latency samples kept per stage for p50/p95/p99
+  sse_heartbeat_ms: 15000                # keep-alive comment on /admin/events
+  log_level: info                        # debug | info | warn | error — structured JSON on stdout; never raw message text

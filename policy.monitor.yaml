@@ -1,0 +1,190 @@
+# =============================================================================
+# Tollgate preset: MONITOR   —   cp policy.monitor.yaml policy.yaml
+# =============================================================================
+# Same schema and the same controls as policy.yaml, but `mode: monitor`:
+# every control still runs, every verdict is recorded with enforced: false,
+# the dashboard shows what WOULD have been blocked or redacted, and the
+# response reaches the caller unchanged. This is the roll-out mode: run it for
+# a day, read the security view, then switch to enforce.
+#
+# Things that still bite in monitor mode:
+#   - authentication (unknown keys are refused; identity is not a control)
+#   - budgets, only because budgets.enforce_in_monitor is true here
+#   - nothing else: no redaction, no blocks, no session kills
+#
+# Everything else below is identical to policy.yaml so that the diff between
+# the two files is exactly: version, mode, budgets.enforce_in_monitor.
+# =============================================================================
+
+version: 200
+mode: monitor
+
+upstream:
+  base_url: http://127.0.0.1:11434/v1
+  timeout_ms: 60000
+
+agents:
+  demo-agent:
+    key: tg_demo-agent_7f3kQ9mZp2xLw8Rv4Nb6
+    scopes: [chat, tools, dry_run]
+    description: "General assistant for the hackathon demo; answers questions and can use the provided tools."
+    memory_namespace: demo
+  research-bot:
+    key: tg_research-bot_Ym3dK8pQ2sT6vW9xA1bC
+    scopes: [chat, tools]
+    models: ["llama3.2:*", "qwen2.5:*"]
+    description: "Summarises documents and web pages for analysts. Read-only."
+    memory_namespace: research
+  finance-agent:
+    key: tg_finance-agent_Qz5wE8rT1yU4iO7pA2sD
+    scopes: [chat, tools]
+    models: ["llama3.2:3b"]
+    description: "Prepares payment instructions for the treasury team. Must never reveal account data or send funds without approval."
+    memory_namespace: finance
+  test-small-budget:
+    key: tg_test-small-budget_Hj2kL5mN8pQ1rS4tV7wX
+    scopes: [chat]
+    description: "Test identity with a deliberately tiny budget."
+  redteam:
+    key: tg_redteam_Rt9uI2oP5aS8dF1gH4jK7l
+    scopes: [chat, tools, dry_run]
+    description: "Internal fuzzer identity."
+
+models:
+  allow:
+    - "llama3.2:3b"
+    - "llama3.2:*"
+    - "qwen2.5:3b"
+    - "qwen2.5:*"
+    - "llama-guard3:1b"
+    - "granite3-guardian:2b"
+  deny_registries: ["*"]
+
+controls:
+  pii:
+    enabled: true
+    action: redact
+    entities: [email, phone, iban, card, pesel]
+    scan_system_prompt: true
+  secrets:
+    enabled: true
+    action: block
+    entropy_min: 3.5
+    entropy_min_len: 32
+    patterns:
+      - "internal_token=\\bgs_int_[A-Za-z0-9]{24,}\\b"
+  unicode:
+    enabled: true
+    action: block
+    max_invisible: 3
+    max_homoglyphs: 3
+  decode:
+    enabled: true
+    action: block
+    max_depth: 2
+  prompt_injection:
+    enabled: true
+    action: block
+    threshold: 0.80
+    heuristics: true
+  content_safety:
+    enabled: true
+    action: block
+    categories: [S1, S2, S9, S11]
+  canaries:
+    enabled: true
+    action: kill_session
+  link_exfil:
+    enabled: true
+    action: redact
+    allow_domains:
+      - intranet.example.com
+      - docs.example.com
+      - github.com
+    min_query_len: 20
+    block_images: true
+  sysprompt:
+    enabled: true
+    action: redact
+    ngram: 8
+    overlap_threshold: 0.20
+    min_run: 12
+  tool_calls:
+    enabled: true
+    action: block
+    allow: ["*"]
+    deny: ["delete_*", "drop_*", "shell", "exec", "run_command"]
+    require_approval: ["send_email", "transfer_funds", "create_payment", "update_*"]
+    approval_timeout_ms: 30000
+    max_arguments_bytes: 16384
+    scan_descriptions: true
+  signatures:
+    enabled: true
+    action: block
+    feed: ./feeds/ai-exploits.json
+    refresh: 60s
+    fail_mode: open
+
+semantic:
+  enabled: true
+  provider: local
+  fail_mode: open
+  classifier_model: llama-guard3:1b
+  judge_model: llama3.2:3b
+  timeout_ms: 1500
+  judge_timeout_ms: 6000
+  judge_min_confidence: 0.60
+  uncertain_band: [0.30, 0.80]
+  classify_context: false
+  max_chars: 6000
+
+budgets:
+  pricing_file: ./pricing.json
+  default_max_tokens: 1024
+  enforce_in_monitor: true               # the one control that still acts in monitor mode
+  default:
+    tokens_per_hour: 50000
+    usd_per_day: 2.00
+    compute_seconds_per_hour: 600
+    max_tool_depth: 8
+    requests_per_minute: 120
+  agents:
+    research-bot:
+      tokens_per_hour: 200000
+      compute_seconds_per_hour: 1800
+      requests_per_minute: 300
+    finance-agent:
+      tokens_per_hour: 20000
+      usd_per_day: 0.50
+      max_tool_depth: 4
+      requests_per_minute: 30
+    test-small-budget:
+      tokens_per_hour: 3000
+      usd_per_day: 0.01
+      compute_seconds_per_hour: 5
+      max_tool_depth: 2
+      requests_per_minute: 20
+    redteam:
+      tokens_per_hour: 5000000
+      requests_per_minute: 2000
+  loop_breaker:
+    enabled: true
+    same_request_within: 30s
+    max_repeats: 5
+    action: block
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    window: 30s
+    open_for: 20s
+
+canaries:
+  auto_generate: 3
+  tokens:
+    - "tgc_StaticCanaryForDemo00001"
+    - "CANARY-RECORD-0badc0de"
+
+telemetry:
+  reservoir_size: 2000
+  sse_heartbeat_ms: 15000
+  log_level: info

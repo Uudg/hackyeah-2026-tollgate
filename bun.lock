@@ -7,6 +7,7 @@
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.9.0",
+        "yaml": "^2.8",
       },
     },
     "apps/dashboard": {
@@ -35,23 +36,22 @@
         "@tollgate/controls": "workspace:*",
         "@tollgate/policy": "workspace:*",
         "hono": "^4.10.0",
+        "yaml": "^2.8",
+        "zod": "^4.1",
       },
     },
     "packages/controls": {
       "name": "@tollgate/controls",
+      "dependencies": {
+        "@tollgate/policy": "workspace:*",
+        "zod": "^4.1",
+      },
     },
     "packages/policy": {
       "name": "@tollgate/policy",
       "dependencies": {
         "yaml": "^2.8",
         "zod": "^4.1",
-      },
-    },
-    "tests": {
-      "name": "@tollgate/tests",
-      "dependencies": {
-        "@tollgate/gateway": "workspace:*",
-        "@tollgate/policy": "workspace:*",
       },
     },
   },
@@ -263,8 +263,6 @@
     "@tollgate/gateway": ["@tollgate/gateway@workspace:apps/gateway"],
 
     "@tollgate/policy": ["@tollgate/policy@workspace:packages/policy"],
-
-    "@tollgate/tests": ["@tollgate/tests@workspace:tests"],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.4", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A=="],
 

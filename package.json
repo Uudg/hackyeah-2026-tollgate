@@ -1,19 +1,48 @@
 {
   "name": "tollgate",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "workspaces": ["apps/*", "packages/*", "tests"],
+  "description": "Tollgate \u2014 AI Control Layer: an OpenAI-compatible proxy that enforces a hot-reloaded policy.yaml with deterministic + local-model semantic controls, budgets, a historical-attack signature feed, a hash-chained audit log, a dashboard and a self-testing suite. HackYeah 2026, Goldman Sachs partner task.",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "bun": ">=1.1.0",
+    "node": ">=20.0.0"
+  },
   "scripts": {
-    "dev": "bun run --filter '@tollgate/gateway' --filter '@tollgate/dashboard' dev",
-    "gateway": "bun run --filter '@tollgate/gateway' dev",
-    "dashboard": "bun run --filter '@tollgate/dashboard' dev",
-    "demo": "bun apps/gateway/src/demo/run.ts",
+    "_comment_dev": "bun's native --filter runs each app's `dev` script concurrently with prefixed output; no `concurrently` dependency needed. apps/gateway defines dev = `bun --watch src/server.ts`, apps/dashboard defines dev = `next dev -p 3000` (runs under Node, never `bun --bun`).",
+    "dev": "bun run --filter './apps/*' dev",
+    "dev:gateway": "bun run --cwd apps/gateway dev",
+    "dev:dashboard": "bun run --cwd apps/dashboard dev",
+    "gateway": "bun run dev:gateway",
+    "dashboard": "bun run dev:dashboard",
+    "start:gateway": "bun run --cwd apps/gateway start",
+    "build:dashboard": "bun run --cwd apps/dashboard build",
+    "_comment_test": "bun test from the repo root picks up bunfig.toml and tests/**/*.test.ts. Deterministic cases always run; fixtures with tags: [model] skip with a message when Ollama/models are absent. test:fast selects cases whose name carries the [deterministic] tag (SPEC \u00a711.2).",
+    "test": "bun test",
+    "test:fast": "bun test --test-name-pattern deterministic",
+    "test:watch": "bun test --watch",
+    "_comment_tools": "Entry points below are TODO until the milestone that creates them (SPEC \u00a71.4, \u00a711.2). Keep the script names and paths.",
     "redteam": "bun apps/gateway/src/redteam/cli.ts",
-    "validate": "bun packages/policy/src/cli/validate.ts",
-    "check": "bun run --filter '*' typecheck && bun run validate"
+    "demo": "bun apps/gateway/src/demo/agent.ts",
+    "bench": "bun tests/latency.test.ts --bench",
+    "policy:check": "bun apps/gateway/src/cli/validate-policy.ts ./policy.yaml",
+    "feed:check": "bun apps/gateway/src/cli/validate-feed.ts ./feeds/ai-exploits.json",
+    "audit:verify": "bun apps/gateway/src/audit/verify.ts ./data/audit.jsonl",
+    "_comment_check": "`check` is the gate for every milestone commit: typecheck every workspace + validate policy.yaml.",
+    "check": "bun run typecheck && bun run policy:check",
+    "typecheck": "bun run --filter '*' typecheck",
+    "doctor": "bash ./scripts/doctor.sh",
+    "setup": "bash ./scripts/setup.sh"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5.9.0"
-  }
+    "typescript": "^5.9.0",
+    "yaml": "^2.8"
+  },
+  "trustedDependencies": [],
+  "_comment_deps": "Root holds toolchain deps plus yaml for the test harness; runtime deps live in each workspace (apps/gateway: hono, yaml, zod; apps/dashboard: next, react, react-dom; packages/policy: zod, yaml)."
 }

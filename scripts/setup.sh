@@ -4,7 +4,14 @@
 # pulls the three models if absent; creates ./data; writes .env from .env.example;
 # runs bun install; prints a readiness table.
 #
-# Usage: ./scripts/setup.sh [--skip-models] [--skip-install]
+# Model pulls never block: by default missing models are pulled in the BACKGROUND (logs in ./data/pull-<model>.log)
+# and the script finishes. The system runs without models (SEMANTIC_PROVIDER=mock, UPSTREAM=echo, see HANDOFF.md §0);
+# model-backed tests skip until the pulls land. ./scripts/doctor.sh shows pull progress.
+#
+# Usage: ./scripts/setup.sh [--wait-models] [--skip-models] [--skip-install]
+#   --wait-models   pull missing models inline and wait (use on a fast connection / judges' machine)
+#   --skip-models   do not pull anything
+#   --skip-install  do not run bun install
 # Env:   OLLAMA_URL (default http://127.0.0.1:11434)
 
 set -u
@@ -15,11 +22,13 @@ cd "$ROOT"
 
 SKIP_MODELS=0
 SKIP_INSTALL=0
+WAIT_MODELS=0
 for arg in "$@"; do
   case "$arg" in
+    --wait-models) WAIT_MODELS=1 ;;
     --skip-models) SKIP_MODELS=1 ;;
     --skip-install) SKIP_INSTALL=1 ;;
-    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -151,7 +160,8 @@ if have ollama; then
     warn "ollama $OLLAMA_V < $MIN_OLLAMA (Probllama); brew upgrade ollama"; row WARN ollama "$OLLAMA_V (< $MIN_OLLAMA)"
   fi
 else
-  fail "ollama could not be installed"; row FAIL ollama "missing"
+  warn "ollama not installed — build and tests run in no-models mode; install later with: brew install ollama"
+  row WARN ollama "missing (brew install ollama); no-models mode active"
 fi
 
 ollama_up() { curl -fsS --max-time 2 "$OLLAMA_URL/api/tags" >/dev/null 2>&1; }
@@ -171,35 +181,55 @@ if have ollama; then
       disown || true
     fi
     for _ in $(seq 1 30); do ollama_up && break; sleep 1; done
-    if ollama_up; then ok "server started at $OLLAMA_URL"; else fail "server not reachable at $OLLAMA_URL after 30 s (see docs/SETUP.md troubleshooting)"; fi
+    if ollama_up; then ok "server started at $OLLAMA_URL"; else warn "server not reachable at $OLLAMA_URL after 30 s (see docs/SETUP.md troubleshooting)"; fi
   fi
 fi
-if ollama_up; then row OK "ollama server" "$OLLAMA_URL"; else row FAIL "ollama server" "not reachable at $OLLAMA_URL"; fi
+if ollama_up; then row OK "ollama server" "$OLLAMA_URL"
+elif have ollama; then row WARN "ollama server" "not reachable at $OLLAMA_URL (ollama serve); no-models mode active"
+else row WARN "ollama server" "ollama not installed; no-models mode active"; fi
 
 # ---------- 6. Models ----------
 step "Models"
 model_present() { # exact tag match against /api/tags
   curl -fsS --max-time 3 "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$1\""
 }
+pull_in_progress() { pgrep -f "ollama pull $1" >/dev/null 2>&1; }
+BG_PULLS=0
 pull_model() {
-  local m="$1" kind="$2"
+  local m="$1" kind="$2" log="$ROOT/data/pull-$(echo "$m" | tr ':/' '__').log"
   if model_present "$m"; then
     ok "$m present"; row OK "model $m" "present ($kind)"
     return
   fi
-  if [ "$SKIP_MODELS" = 1 ] || ! ollama_up; then
-    if [ "$kind" = required ]; then fail "$m missing"; row FAIL "model $m" "missing ($kind)"; else warn "$m missing"; row WARN "model $m" "missing ($kind)"; fi
+  if pull_in_progress "$m"; then
+    ok "$m pull already running in background (log: ${log#$ROOT/})"; row WARN "model $m" "pulling in background ($kind)"
+    BG_PULLS=$((BG_PULLS+1))
     return
   fi
-  info "pulling $m ($kind) — this is the slow step on arena Wi-Fi; re-run the script if it stalls, pulls resume"
-  if ollama pull "$m"; then
-    ok "$m pulled"; row OK "model $m" "pulled ($kind)"
+  if [ "$SKIP_MODELS" = 1 ] || ! ollama_up; then
+    warn "$m missing ($kind) — system runs in no-models mode (SEMANTIC_PROVIDER=mock, UPSTREAM=echo)"
+    row WARN "model $m" "missing ($kind); ollama pull $m"
+    return
+  fi
+  if [ "$WAIT_MODELS" = 1 ]; then
+    info "pulling $m ($kind) inline — slow on arena Wi-Fi; Ctrl-C and re-run resumes"
+    if ollama pull "$m"; then ok "$m pulled"; row OK "model $m" "pulled ($kind)"
+    else warn "$m pull failed ($kind)"; row WARN "model $m" "pull failed ($kind); retry: ollama pull $m"; fi
   else
-    if [ "$kind" = required ]; then fail "$m pull failed"; row FAIL "model $m" "pull failed ($kind)"; else warn "$m pull failed (optional)"; row WARN "model $m" "pull failed ($kind)"; fi
+    mkdir -p "$ROOT/data"
+    nohup ollama pull "$m" >"$log" 2>&1 &
+    disown || true
+    ok "$m pull started in background (log: ${log#$ROOT/})"
+    row WARN "model $m" "pulling in background ($kind); progress: tail -f ${log#$ROOT/}"
+    BG_PULLS=$((BG_PULLS+1))
   fi
 }
 for m in "${REQUIRED_MODELS[@]}"; do pull_model "$m" required; done
 for m in "${OPTIONAL_MODELS[@]}"; do pull_model "$m" optional; done
+if [ "$BG_PULLS" -gt 0 ]; then
+  info "Models are not needed to build or test: .env defaults to SEMANTIC_PROVIDER=mock and UPSTREAM=echo."
+  info "When ./scripts/doctor.sh shows all models present, set SEMANTIC_PROVIDER=ollama and UPSTREAM=ollama in .env."
+fi
 
 # ---------- 7. Directories ----------
 step "Directories"
@@ -219,8 +249,8 @@ elif [ -f "$ROOT/.env.example" ]; then
   if have openssl; then
     TOKEN="$(openssl rand -hex 16)"
     # replace an empty or placeholder ADMIN_TOKEN with a generated one (macOS and GNU sed)
-    sed -i.bak -E "s/^ADMIN_TOKEN=.*/ADMIN_TOKEN=$TOKEN/" "$ROOT/.env" && rm -f "$ROOT/.env.bak"
-    ok ".env created from .env.example with a generated ADMIN_TOKEN"
+    sed -i.bak -E "s/^ADMIN_TOKEN=.*/ADMIN_TOKEN=$TOKEN/; s/^NEXT_PUBLIC_ADMIN_TOKEN=.*/NEXT_PUBLIC_ADMIN_TOKEN=$TOKEN/" "$ROOT/.env" && rm -f "$ROOT/.env.bak"
+    ok ".env created from .env.example with a generated ADMIN_TOKEN (also set as NEXT_PUBLIC_ADMIN_TOKEN)"
   else
     ok ".env created from .env.example — set ADMIN_TOKEN manually"
   fi
@@ -265,4 +295,8 @@ if [ "$FAILS" -gt 0 ]; then
   printf '%s%d check(s) failed.%s See docs/SETUP.md → Troubleshooting, fix, and re-run ./scripts/setup.sh\n' "$C_FAIL" "$FAILS" "$C_RST"
   exit 1
 fi
-printf '%sReady.%s Next: bun run dev   (gateway :8787 + dashboard :3000), then bun test\n' "$C_OK" "$C_RST"
+if [ "$BG_PULLS" -gt 0 ]; then
+  printf '%sReady (no-models mode).%s %d model pull(s) running in background. Next: bun run dev, then bun test. Re-run ./scripts/doctor.sh to see when models land.\n' "$C_OK" "$C_RST" "$BG_PULLS"
+else
+  printf '%sReady.%s Next: bun run dev   (gateway :8787 + dashboard :3000), then bun test\n' "$C_OK" "$C_RST"
+fi

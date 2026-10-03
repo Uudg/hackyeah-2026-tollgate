@@ -1,0 +1,180 @@
+# =============================================================================
+# Tollgate preset: STRICT   —   cp policy.strict.yaml policy.yaml
+# =============================================================================
+# Same schema as policy.yaml (all keys are documented there). Differences:
+#   - every control blocks instead of redacting; secrets and canaries kill the session
+#   - semantic.fail_mode: closed  → if the classifier is unreachable, requests are blocked
+#   - signatures.fail_mode: closed → no feed, no traffic
+#   - prompt_injection.threshold 0.60 and a wider uncertain band → more goes to the judge
+#   - content_safety covers every Llama Guard category
+#   - only one model allowed; tool calls are allowlisted, not denylisted
+#   - budgets cut to a quarter; loop breaker trips after 3 repeats
+#   - budgets are enforced even in monitor mode
+# Expect more false positives: the positive test cases in tests/cases that rely
+# on `redact` will fail under this preset by design (the summary table shows it).
+# =============================================================================
+
+version: 100
+mode: enforce
+
+upstream:
+  base_url: http://127.0.0.1:11434/v1
+  timeout_ms: 30000
+
+agents:
+  demo-agent:
+    key: tg_demo-agent_7f3kQ9mZp2xLw8Rv4Nb6
+    scopes: [chat, tools, dry_run]
+    models: ["llama3.2:3b"]
+    description: "General assistant for the hackathon demo; answers questions and can use the provided tools."
+    memory_namespace: demo
+  research-bot:
+    key: tg_research-bot_Ym3dK8pQ2sT6vW9xA1bC
+    scopes: [chat]                       # no tools at all under strict
+    models: ["llama3.2:3b"]
+    description: "Summarises documents and web pages for analysts. Read-only."
+    memory_namespace: research
+  finance-agent:
+    key: tg_finance-agent_Qz5wE8rT1yU4iO7pA2sD
+    scopes: [chat, tools]
+    models: ["llama3.2:3b"]
+    description: "Prepares payment instructions for the treasury team. Must never reveal account data or send funds without approval."
+    memory_namespace: finance
+  test-small-budget:
+    key: tg_test-small-budget_Hj2kL5mN8pQ1rS4tV7wX
+    scopes: [chat]
+    description: "Test identity with a deliberately tiny budget."
+  redteam:
+    key: tg_redteam_Rt9uI2oP5aS8dF1gH4jK7l
+    scopes: [chat, tools, dry_run]
+    description: "Internal fuzzer identity."
+
+models:
+  allow: ["llama3.2:3b", "llama-guard3:1b", "granite3-guardian:2b"]
+  deny_registries: ["*"]
+
+controls:
+  pii:
+    enabled: true
+    action: block                        # no PII in either direction
+    entities: [email, phone, iban, card, pesel, ip]
+    scan_system_prompt: true
+  secrets:
+    enabled: true
+    action: kill_session                 # a credential in a request ends the session
+    entropy_min: 3.2                     # lower = more tokens count as secrets
+    entropy_min_len: 24
+    patterns:
+      - "internal_token=\\bgs_int_[A-Za-z0-9]{24,}\\b"
+  unicode:
+    enabled: true
+    action: block
+    max_invisible: 1                     # a single zero-width character is enough
+    max_homoglyphs: 1
+  decode:
+    enabled: true
+    action: block
+    max_depth: 3
+  prompt_injection:
+    enabled: true
+    action: block
+    threshold: 0.60
+    heuristics: true
+  content_safety:
+    enabled: true
+    action: block
+    categories: [S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14]
+  canaries:
+    enabled: true
+    action: kill_session
+  link_exfil:
+    enabled: true
+    action: block                        # any data-bearing link to an unknown host fails the whole response
+    allow_domains: [intranet.example.com]
+    min_query_len: 8
+    block_images: true
+  sysprompt:
+    enabled: true
+    action: block
+    ngram: 6
+    overlap_threshold: 0.10
+    min_run: 8
+  tool_calls:
+    enabled: true
+    action: block
+    allow: ["search_docs", "get_weather", "calculator", "read_file", "send_email", "transfer_funds"]  # allowlist only
+    deny: ["delete_*", "drop_*", "shell", "exec", "run_command", "write_*"]
+    require_approval: ["send_email", "transfer_funds", "read_file"]
+    approval_timeout_ms: 15000
+    max_arguments_bytes: 4096
+    scan_descriptions: true
+  signatures:
+    enabled: true
+    action: block
+    feed: ./feeds/ai-exploits.json
+    refresh: 30s
+    fail_mode: closed
+
+semantic:
+  enabled: true
+  provider: local
+  fail_mode: closed                      # classifier down = nothing passes
+  classifier_model: llama-guard3:1b
+  jailbreak_model: granite3-guardian:2b  # second vote, if pulled
+  judge_model: llama3.2:3b
+  timeout_ms: 2500
+  judge_timeout_ms: 8000
+  judge_min_confidence: 0.50
+  uncertain_band: [0.20, 0.60]
+  classify_context: true                 # multi-turn attacks: send previous turns to the classifier
+  max_chars: 4000
+
+budgets:
+  pricing_file: ./pricing.json
+  default_max_tokens: 512
+  enforce_in_monitor: true
+  default:
+    tokens_per_hour: 12000
+    usd_per_day: 0.50
+    compute_seconds_per_hour: 150
+    max_tool_depth: 3
+    requests_per_minute: 30
+  agents:
+    research-bot:
+      tokens_per_hour: 50000
+      compute_seconds_per_hour: 450
+    finance-agent:
+      tokens_per_hour: 5000
+      usd_per_day: 0.10
+      max_tool_depth: 2
+      requests_per_minute: 10
+    test-small-budget:
+      tokens_per_hour: 3000
+      usd_per_day: 0.01
+      compute_seconds_per_hour: 5
+      max_tool_depth: 2
+      requests_per_minute: 20
+    redteam:
+      tokens_per_hour: 5000000
+      requests_per_minute: 2000
+  loop_breaker:
+    enabled: true
+    same_request_within: 60s
+    max_repeats: 3
+    action: kill_session                 # a looping agent is taken off the line
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 3
+    window: 30s
+    open_for: 60s
+
+canaries:
+  auto_generate: 5
+  tokens:
+    - "tgc_StaticCanaryForDemo00001"
+    - "CANARY-RECORD-0badc0de"
+
+telemetry:
+  reservoir_size: 5000
+  sse_heartbeat_ms: 10000
+  log_level: info

@@ -9,8 +9,10 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@tollgate/policy": "workspace:*",
     "@tollgate/controls": "workspace:*",
-    "hono": "^4.10.0"
+    "@tollgate/policy": "workspace:*",
+    "hono": "^4.10.0",
+    "yaml": "^2.8",
+    "zod": "^4.1"
   }
 }
