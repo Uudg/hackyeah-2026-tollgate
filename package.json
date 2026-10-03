@@ -28,22 +28,24 @@
     "_comment_tools": "Entry points below are TODO until the milestone that creates them (SPEC §1.4, §11.2). Keep the script names and paths.",
     "redteam": "bun apps/gateway/src/redteam/cli.ts",
     "demo": "bun apps/gateway/src/demo/agent.ts",
+    "example:sdk": "bun examples/openai-sdk.ts",
     "bench": "bun tests/latency.test.ts --bench",
     "policy:check": "bun apps/gateway/src/cli/validate-policy.ts ./policy.yaml",
     "feed:check": "bun apps/gateway/src/cli/validate-feed.ts ./feeds/ai-exploits.json",
     "audit:verify": "bun apps/gateway/src/audit/verify.ts ./data/audit.jsonl",
     "_comment_check": "`check` is the gate for every milestone commit: typecheck every workspace + validate policy.yaml.",
     "check": "bun run typecheck && bun run policy:check",
-    "typecheck": "bun run --filter '*' typecheck && tsc --noEmit -p tests",
+    "typecheck": "bun run --filter '*' typecheck && tsc --noEmit -p tests && tsc --noEmit -p examples",
     "doctor": "bash ./scripts/doctor.sh",
     "setup": "bash ./scripts/setup.sh"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "openai": "^7.27.0",
     "typescript": "^5.9.0",
     "yaml": "^2.8",
     "zod": "^4.1"
   },
   "trustedDependencies": [],
-  "_comment_deps": "Root holds toolchain deps plus yaml and zod for the test harness; runtime deps live in each workspace (apps/gateway: hono, yaml, zod; apps/dashboard: next, react, react-dom; packages/policy: zod, yaml)."
+  "_comment_deps": "Root holds toolchain deps plus yaml and zod for the test harness and openai for examples/openai-sdk.ts; runtime deps live in each workspace (apps/gateway: hono, yaml, zod; apps/dashboard: next, react, react-dom; packages/policy: zod, yaml)."
 }

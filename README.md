@@ -305,9 +305,23 @@ Edit the file while the gateway runs: the next request uses the new entries and 
 
 ---
 
-## Integrating Tollgate
+## Works with any OpenAI-compatible client
 
-Any OpenAI-compatible client works by changing two values:
+Any OpenAI-compatible client works by changing two values. `examples/openai-sdk.ts` uses the official `openai` npm package with only `baseURL` and `apiKey` changed and sends a clean request, one with an IBAN and one injection:
+
+```sh
+bun run example:sdk
+```
+
+```
+clean     200 allow -  OK: In one sentence, what is a supplier payment batch?
+iban      200 redact pii.iban  OK: Refund the client to [REDACTED:iban] and confirm.
+injection 403 block inject.heuristic.1  403 Blocked by Tollgate rule inject.heuristic.1
+```
+
+(Output with `UPSTREAM=echo`; with Ollama the replies are the model's. `tests/sdk.test.ts` runs the same SDK against an in-process gateway and skips with a message if the package is not installed.)
+
+The same two values in your own code:
 
 ```ts
 import OpenAI from "openai";
@@ -361,6 +375,7 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 | Package | Licence | Used for |
 |---|---|---|
 | hono | MIT | gateway HTTP framework |
+| openai (dev) | Apache 2.0 | `examples/openai-sdk.ts` and `tests/sdk.test.ts` only, proves SDK compatibility |
 | zod | MIT | schema validation at every boundary |
 | yaml | ISC | policy and fixture parsing |
 | next, react, react-dom | MIT | dashboard |
