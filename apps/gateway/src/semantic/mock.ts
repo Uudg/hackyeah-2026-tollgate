@@ -24,6 +24,6 @@ export function createMockProvider(markers: string[]): SemanticProvider {
         ? { verdict: "block", confidence: 0.9, category: ctx.flagged ? "other" : "prompt_injection", reason: "mock judge: marker TG-MOCK-JUDGE-BLOCK", ms: performance.now() - t0, model: "mock" }
         : { verdict: "allow", confidence: 0.9, category: "none", reason: "mock judge", ms: performance.now() - t0, model: "mock" };
     },
-    async status() { return { classifier: true, judge: true }; },
+    async status() { return { classifier: true, judge: true, jailbreak: null }; },
   };
 }

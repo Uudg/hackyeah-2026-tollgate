@@ -121,7 +121,7 @@ check_model() { # check_model <tag> <role> <required|optional>
 check_model "$DEMO_MODEL" "demo agent (DEMO_MODEL)" required
 check_model "$GUARD_MODEL" "tier-1 classifier (policy semantic.classifier_model)" required
 [ "$JUDGE_MODEL" != "$DEMO_MODEL" ] && check_model "$JUDGE_MODEL" "tier-2 judge (policy semantic.judge_model)" required
-check_model "$OPTIONAL_MODEL" "optional jailbreak classifier" optional
+check_model "$OPTIONAL_MODEL" "optional jailbreak vote (policy.strict.yaml sets it; when missing the vote is skipped and Llama Guard decides alone)" optional
 if [ "$NEED_MODELS" = 0 ] && [ "$MODELS_TOTAL" -gt 0 ] && [ "$MODELS_PRESENT" = "$MODELS_TOTAL" ]; then
   emit OK "switch to real models" "all required models present: set SEMANTIC_PROVIDER=ollama and UPSTREAM=ollama in .env, re-run bun test"
 fi
@@ -166,6 +166,10 @@ else emit WARN "policy $POLICY_PATH" "missing (policy.yaml is in the repo; check
 # ---- running services (informational) ----
 if curl -fsS --max-time 2 "http://localhost:$GATEWAY_PORT/healthz" >/dev/null 2>&1; then
   emit OK "gateway /healthz" "responding on :$GATEWAY_PORT"
+  # The gateway reports degraded-but-running states (e.g. a missing optional model) as "WARN ..." strings.
+  curl -fsS --max-time 2 "http://localhost:$GATEWAY_PORT/healthz" 2>/dev/null | grep -o '"WARN [^"]*"' | sed 's/^"WARN //;s/"$//' | while IFS= read -r w; do
+    emit WARN "gateway warning" "$w"
+  done
 else
   emit WARN "gateway /healthz" "not running (bun run dev:gateway)"
 fi

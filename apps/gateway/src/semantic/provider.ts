@@ -38,7 +38,8 @@ export interface SemanticProvider {
   classify(text: string, ctx: SemanticContext): Promise<ClassifyResult>;
   judge(text: string, ctx: SemanticContext): Promise<JudgeResult>;
   /** Which configured models are available (for /healthz and the posture score). */
-  status(policy: Policy): Promise<{ classifier: boolean; judge: boolean }>;
+  /** jailbreak: null when policy.semantic.jailbreak_model is not set (optional model, never required). */
+  status(policy: Policy): Promise<{ classifier: boolean; judge: boolean; jailbreak: boolean | null }>;
 }
 
 export const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {

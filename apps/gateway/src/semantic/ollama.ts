@@ -71,17 +71,24 @@ export function createOllamaProvider(baseUrl: string, keepAlive: string): Semant
       const jail = s.jailbreak_model
         ? chat({ model: s.jailbreak_model, options: { temperature: 0, num_predict: 8 }, messages: [{ role: "system", content: "jailbreak" }, { role: "user", content: text.slice(0, s.max_chars) }] }, ctx.signal)
         : null;
-      const [g, j] = await Promise.all([guard, jail]);
+      // The classifier is required: its failure propagates and semantic.fail_mode decides. The jailbreak model is an
+      // optional second vote: if it is missing or fails, the vote is skipped and Llama Guard decides alone.
+      const [gs, js] = await Promise.allSettled([guard, jail ?? Promise.resolve(null)]);
+      if (gs.status === "rejected") throw gs.reason;
+      const g = gs.value;
       const parsedGuard = parseGuard(g);
       const votes: number[] = parsedGuard.parsed ? [parsedGuard.score] : [];
       let raw = g.trim();
-      if (j !== null) {
-        const ans = j.trim().toLowerCase();
+      let jailVoted = false;
+      if (js.status === "rejected") raw += " | jailbreak:unavailable";
+      else if (js.value !== null) {
+        const ans = js.value.trim().toLowerCase();
         if (ans.startsWith("yes")) votes.push(1); else if (ans.startsWith("no")) votes.push(0);
+        jailVoted = true;
         raw += ` | jailbreak:${ans.slice(0, 20)}`;
       }
       const score = votes.length ? votes.reduce((a, b) => a + b, 0) / votes.length : 0;
-      return { score, categories: parsedGuard.categories, raw: raw.slice(0, 200), parsed: votes.length > 0, ms: performance.now() - t0, model: s.classifier_model + (s.jailbreak_model ? `+${s.jailbreak_model}` : "") };
+      return { score, categories: parsedGuard.categories, raw: raw.slice(0, 200), parsed: votes.length > 0, ms: performance.now() - t0, model: s.classifier_model + (jailVoted ? `+${s.jailbreak_model}` : "") };
     },
     async judge(text: string, ctx: SemanticContext): Promise<JudgeResult> {
       const t0 = performance.now();
@@ -99,9 +106,10 @@ export function createOllamaProvider(baseUrl: string, keepAlive: string): Semant
         const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(1000) });
         const names = Tags.parse(await res.json()).models.map((m) => m.name);
         const has = (m: string) => names.includes(m) || names.includes(`${m}:latest`);
-        return { classifier: has(policy.semantic.classifier_model), judge: has(policy.semantic.judge_model) };
+        const jb = policy.semantic.jailbreak_model;
+        return { classifier: has(policy.semantic.classifier_model), judge: has(policy.semantic.judge_model), jailbreak: jb ? has(jb) : null };
       } catch {
-        return { classifier: false, judge: false }; // Ollama unreachable: reported as unavailable, not an error
+        return { classifier: false, judge: false, jailbreak: policy.semantic.jailbreak_model ? false : null }; // Ollama unreachable: reported as unavailable, not an error
       }
     },
   };

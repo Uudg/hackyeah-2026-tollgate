@@ -159,7 +159,11 @@ export function createGateway(opts: GatewayOptions): Gateway {
     const p = ctx.policy();
     const f = ctx.feed();
     const models = await semantic.status(p.value);
+    // WARN rows: things that degrade a control without stopping the gateway.
+    const warnings: string[] = [];
+    if (models.jailbreak === false) warnings.push(`WARN optional semantic.jailbreak_model ${p.value.semantic.jailbreak_model} is not pulled: the jailbreak vote is skipped and ${p.value.semantic.classifier_model} decides alone (ollama pull ${p.value.semantic.jailbreak_model})`);
     return c.json({
+      warnings,
       ok: true, version: VERSION,
       policy: { hash: p.hash, version: p.value.version },
       feed: { hash: f?.loaded.hash ?? null, entries: f?.loaded.value.entries.length ?? 0 },

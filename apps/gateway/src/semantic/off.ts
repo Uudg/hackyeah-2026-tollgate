@@ -5,5 +5,5 @@ export const offProvider: SemanticProvider = {
   name: "off",
   async classify() { throw new Error("semantic provider is off"); },
   async judge() { throw new Error("semantic provider is off"); },
-  async status() { return { classifier: false, judge: false }; },
+  async status() { return { classifier: false, judge: false, jailbreak: null }; },
 };
