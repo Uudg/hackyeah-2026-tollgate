@@ -1,4 +1,4 @@
-// schema v1 — dashboard / HTTP contract: SSE events and admin + metrics JSON shapes.
+// schema v1.1 — dashboard / HTTP contract: SSE events and admin + metrics JSON shapes.
 import { z } from "zod";
 import { DecisionRecordSchema } from "./decision.ts";
 import { ActionSchema, ModeSchema, OwaspIdSchema } from "./common.ts";
@@ -75,3 +75,34 @@ export const AdminRedteamSchema = z.object({
   last_run: z.object({ run_id: z.string(), started_at: z.string(), finished_at: z.string().nullable(), attempts: z.number(), bypasses: z.number(), policy_version: z.string() }).nullable(),
   per_control: z.array(z.object({ control: z.string(), attempts: z.number(), bypasses: z.number(), rate: z.number() })),
 });
+
+/**
+ * POST /admin/playground — the dashboard's way to send a chat request as an agent without holding its key.
+ * The gateway runs the full pipeline with that agent's identity and returns the record for the stage timeline.
+ */
+export const PlaygroundRequestSchema = z.object({
+  agent: z.string(),
+  model: z.string(),
+  messages: z.array(z.object({ role: z.enum(["system", "user", "assistant", "tool"]), content: z.string() })).min(1),
+  use_tools: z.boolean().default(false),   // attach the demo agent's three tools
+  echo: z.string().optional(),              // X-Tollgate-Echo preset, only honoured when UPSTREAM=echo
+});
+export type PlaygroundRequest = z.infer<typeof PlaygroundRequestSchema>;
+
+export const PlaygroundResponseSchema = z.object({
+  status: z.number(),
+  decision: ActionSchema,
+  rule_id: z.string(),
+  content: z.string().nullable(),           // assistant text as the caller received it (redacted), null when blocked
+  tool_calls: z.array(z.object({ name: z.string(), arguments: z.string() })),
+  error: z.object({ type: z.string(), rule: z.string(), message: z.string() }).nullable(),
+  record: DecisionRecordSchema,
+});
+export type PlaygroundResponse = z.infer<typeof PlaygroundResponseSchema>;
+
+export type AdminPolicy = z.infer<typeof AdminPolicySchema>;
+export type AdminStats = z.infer<typeof AdminStatsSchema>;
+export type AdminAgents = z.infer<typeof AdminAgentsSchema>;
+export type AdminFeed = z.infer<typeof AdminFeedSchema>;
+export type AuditVerify = z.infer<typeof AuditVerifySchema>;
+export type AdminRedteam = z.infer<typeof AdminRedteamSchema>;
