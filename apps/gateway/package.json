@@ -1,0 +1,16 @@
+{
+  "name": "@tollgate/gateway",
+  "private": true,
+  "type": "module",
+  "main": "src/app.ts",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@tollgate/policy": "workspace:*",
+    "@tollgate/controls": "workspace:*",
+    "hono": "^4.10.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "tollgate",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*", "tests"],
+  "scripts": {
+    "dev": "bun run --filter '@tollgate/gateway' --filter '@tollgate/dashboard' dev",
+    "gateway": "bun run --filter '@tollgate/gateway' dev",
+    "dashboard": "bun run --filter '@tollgate/dashboard' dev",
+    "demo": "bun apps/gateway/src/demo/run.ts",
+    "redteam": "bun apps/gateway/src/redteam/cli.ts",
+    "validate": "bun packages/policy/src/cli/validate.ts",
+    "check": "bun run --filter '*' typecheck && bun run validate"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.0"
+  }
+}

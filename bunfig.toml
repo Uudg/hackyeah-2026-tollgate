@@ -1,0 +1,4 @@
+[test]
+root = "."
+timeout = 30000
+coverageSkipTestFiles = true

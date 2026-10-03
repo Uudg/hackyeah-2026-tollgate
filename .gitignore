@@ -1,0 +1,8 @@
+node_modules/
+data/
+.next/
+.env
+*.log
+.DS_Store
+tests/last-run.json
+*.tsbuildinfo

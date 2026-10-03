@@ -1,0 +1,10 @@
+{
+  "name": "@tollgate/tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "typecheck": "tsc --noEmit -p ." },
+  "dependencies": {
+    "@tollgate/policy": "workspace:*",
+    "@tollgate/gateway": "workspace:*"
+  }
+}
