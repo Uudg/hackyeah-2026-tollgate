@@ -1,0 +1,14 @@
+{
+  "currency": "USD",
+  "models": {
+    "llama3.2:3b": { "input_per_1k": 0, "output_per_1k": 0, "local": true },
+    "llama3.2:*": { "input_per_1k": 0, "output_per_1k": 0, "local": true },
+    "qwen2.5:*": { "input_per_1k": 0, "output_per_1k": 0, "local": true },
+    "llama-guard3:*": { "input_per_1k": 0, "output_per_1k": 0, "local": true },
+    "granite3-guardian:*": { "input_per_1k": 0, "output_per_1k": 0, "local": true },
+    "gpt-4o": { "input_per_1k": 0.0025, "output_per_1k": 0.01 },
+    "gpt-4o-mini": { "input_per_1k": 0.00015, "output_per_1k": 0.0006 },
+    "claude-sonnet-4-5": { "input_per_1k": 0.003, "output_per_1k": 0.015 }
+  },
+  "default": { "input_per_1k": 0.001, "output_per_1k": 0.002 }
+}

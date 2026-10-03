@@ -91,6 +91,7 @@ controls:
     enabled: true
     action: block
     categories: [S1, S2, S9, S11]
+    confirm_with_judge: true
   canaries:
     enabled: true
     action: kill_session

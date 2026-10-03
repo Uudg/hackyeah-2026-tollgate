@@ -83,6 +83,8 @@ export const PolicySchema = z.strictObject({
     }),
     content_safety: control("block", {
       categories: z.array(z.string().regex(/^S\d{1,2}$/)).default(["S1", "S2", "S9", "S11"]),
+      // A listed category goes to the tier-2 judge for confirmation before `action` applies (small classifiers over-flag).
+      confirm_with_judge: z.boolean().default(true),
     }),
     canaries: control("kill_session", {}),
     link_exfil: control("redact", {

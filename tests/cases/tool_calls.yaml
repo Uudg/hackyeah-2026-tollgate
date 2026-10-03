@@ -207,3 +207,18 @@
   policy:
     controls.tool_calls.enabled: false
   expect: { decision: allow, status: 200 }   # judges "remove a control": the denied tool now passes
+
+- id: tool-escaped-secret-in-arguments
+  control: secrets
+  owasp: [LLM02, ASI02]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "Open a ticket for the deploy key rotation."
+  tools:
+    - { type: function, function: { name: create_ticket, parameters: { type: object, properties: { text: { type: string } }, required: [text] } } }
+  mock_upstream:
+    tool_calls:
+      - { id: call_1, type: function, function: { name: create_ticket, arguments: '{"text":"rotate key AKIA\u0049OSFODNN7EXAMPLE today"}' } }
+  expect:
+    rule: secrets.aws_access_key       # the raw JSON has \u0049; found only after unescaping the argument values (SPEC §16 D6)
+    direction: tool_call

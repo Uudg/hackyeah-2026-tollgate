@@ -23,7 +23,7 @@
 #   cp policy.strict.yaml policy.yaml   ← this is the "change strictness" demo
 # =============================================================================
 
-version: 12            # human-readable counter; bump it when you change something.
+version: 13            # human-readable counter; bump it when you change something.
                        # The gateway identifies policies by content hash, so forgetting
                        # to bump it is harmless — the hash still changes.
 
@@ -139,11 +139,14 @@ controls:
                                          # Lower = stricter. Scores inside semantic.uncertain_band go to the judge.
     heuristics: true                     # the fixed regex list ("ignore previous instructions", "<|im_start|>system", ...)
 
-  content_safety:                        # Llama Guard 3 categories that are blocked outright
+  content_safety:                        # Llama Guard 3 categories that are acted on
     enabled: true
     action: block
     categories: [S1, S2, S9, S11]        # S1 violent crimes, S2 non-violent crimes, S9 indiscriminate weapons,
                                          # S11 self-harm. Full list: S1–S14 (S14 = code interpreter abuse).
+    confirm_with_judge: true             # true: a flagged category goes to the tier-2 judge, which confirms (block)
+                                         # or overturns it. llama-guard3:1b flags ordinary payment/supplier requests
+                                         # as S1/S2; the judge clears those. false: block at tier 1 (policy.strict.yaml).
 
   canaries:                              # fake secrets planted in system prompts / memory. Any appearance in
     enabled: true                        # output, tool-call arguments or untrusted input is proof of a leak.

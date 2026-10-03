@@ -6,7 +6,7 @@
 #   - semantic.fail_mode: closed  → if the classifier is unreachable, requests are blocked
 #   - signatures.fail_mode: closed → no feed, no traffic
 #   - prompt_injection.threshold 0.60 and a wider uncertain band → more goes to the judge
-#   - content_safety covers every Llama Guard category
+#   - content_safety covers every Llama Guard category and blocks at tier 1 (no judge confirmation)
 #   - only one model allowed; tool calls are allowlisted, not denylisted
 #   - budgets cut to a quarter; loop breaker trips after 3 repeats
 #   - budgets are enforced even in monitor mode
@@ -84,6 +84,7 @@ controls:
     enabled: true
     action: block
     categories: [S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14]
+    confirm_with_judge: false            # the classifier's flag blocks at tier 1, no second opinion
   canaries:
     enabled: true
     action: kill_session

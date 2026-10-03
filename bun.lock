@@ -8,6 +8,7 @@
         "@types/bun": "latest",
         "typescript": "^5.9.0",
         "yaml": "^2.8",
+        "zod": "^4.1",
       },
     },
     "apps/dashboard": {

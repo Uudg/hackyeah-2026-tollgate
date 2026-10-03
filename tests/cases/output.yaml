@@ -139,3 +139,18 @@
   mock_upstream:
     content: "The capital of Latvia is Riga."
   expect: { decision: allow, status: 200, output_contains: ["Riga"] }
+
+- id: out-stream-pii-redacted
+  control: pii
+  owasp: [LLM02]
+  tags: [deterministic]
+  agent: demo-agent
+  input: "Who do we pay this month?"
+  stream: true
+  mock_upstream:
+    content: "Pay Nordlicht at PL61 1090 1014 0000 0712 1981 2874 by Friday."
+  expect:
+    decision: redact
+    direction: response
+    output_contains: ["data: ", "[REDACTED:iban]", "[DONE]"]
+    output_not_contains: ["1981 2874"]  # buffered streaming: the output path runs before any chunk is sent (SPEC §16 D14)
