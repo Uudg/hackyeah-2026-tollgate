@@ -1,6 +1,8 @@
 # Tollgate — Technical Specification
 
-Tollgate is an OpenAI-compatible HTTP proxy that sits between any agent/app and any model, MCP server or tool, and enforces a single `policy.yaml`. This document is the implementation contract: names, shapes, orders and defaults are fixed here so that code can be written without guessing. Where this spec and `_context.md` disagree, `_context.md` wins; where this spec and any other doc disagree, this spec wins.
+> **Status: reference only, superseded on names and routes.** Precedence is `HANDOFF.md` > `docs/PLAN.md` > this file. The canonical rule ids, event names, routes and headers are in `docs/PLAN.md` section 1 and the frozen code in `packages/policy`. Use this file only for algorithm detail (normalisation lists, PII/secret regexes, IBAN/PESEL validation, pickle walker, link-exfil rules, sysprompt n-grams, mutation operators). Known differences that do NOT apply: `models.*` rule ids (use `model.*`), `sig.<id>` (use `feed.<id>`), `inject.*` (use `injection.soft` / `judge.*`), `sysprompt.leak` (use `output.system_prompt_leak`), `canaries.*` (use `canary.leak`), session kill (use agent lock, `agent.locked`), `/admin/events` (use `/events`), `/admin/audit/export|verify` (use `/audit/export|verify`), `/admin/metrics` (use `/metrics`), `pricing.json` (prices live in `policy.yaml`), approval queue (out of scope; approval-listed tool calls are blocked with `tool.approval`), and `ADMIN_TOKEN` (optional: when unset, `/admin/*` is open on localhost; the gateway never refuses to start for lack of it). Subagents must not read this file for names.
+
+Tollgate is an OpenAI-compatible HTTP proxy that sits between any agent/app and any model, MCP server or tool, and enforces a single `policy.yaml`. This document holds implementation detail for the algorithms named above.
 
 Conventions used below:
 - Ports: gateway `8787`, dashboard `3000`, Ollama `11434`.
