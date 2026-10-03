@@ -1,0 +1,29 @@
+flowchart TB
+  C["Caller: agent / app / MCP host<br/>base_url = :8787/v1 · Bearer tg_&lt;agent&gt;_&lt;random&gt;"]
+  PY["policy.yaml · pricing.json · feeds/ai-exploits.json<br/>hot reload · zod · last good version kept"]
+  subgraph gw["Tollgate gateway · Bun + Hono · :8787 · any stage can end the request: 403 block / 429 budget"]
+    direction LR
+    ID["Identity + budget<br/>key → agent, scopes<br/>model allowlist<br/>tokens · usd · compute<br/>loop + circuit breaker"]
+    T0["Tier 0 · deterministic<br/>about 0.5 ms<br/>normalize · decode-and-rescan<br/>secrets · PII · heuristics<br/>signature feed · canaries"]
+    T1["Tier 1 · classifier<br/>llama-guard3:1b<br/>timeout · fail open/closed"]
+    T2["Tier 2 · LLM judge<br/>llama3.2:3b · strict JSON<br/>uncertain band only"]
+    UP["Upstream<br/>Ollama /v1"]
+    OUT["Output scan<br/>redact · canary · link exfil<br/>prompt leak · tool-call gate"]
+    REC["Decision record<br/>audit · metrics · events"]
+    ID --> T0 --> T1 -->|uncertain| T2 --> UP
+    T1 -->|safe| UP
+    UP --> OUT --> REC
+  end
+  OL[("Ollama :11434<br/>llama-guard3:1b · llama3.2:3b")]
+  AU[("audit.jsonl<br/>sha256 hash chain")]
+  DB[("tollgate.db<br/>SQLite")]
+  DASH["Dashboard · Next.js · :3000<br/>/admin/* + SSE"]
+  RT["Red Team Loop<br/>seeds × mutators"]
+  C -->|"POST /v1/chat/completions<br/>reply: 200 / 403 / 429 + X-Tollgate-* headers"| gw
+  PY -.->|snapshot per request| gw
+  gw -.->|"tiers 1, 2 and upstream"| OL
+  gw --> AU
+  gw --> DB
+  gw -->|SSE| DASH
+  DASH --> RT
+  RT -.->|"dry-run requests"| gw

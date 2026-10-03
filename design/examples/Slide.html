@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../tokens.css"><link rel="stylesheet" href="../components.css"><style>html,body{margin:0}
+.mid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.row{display:grid;grid-template-columns:96px 130px 1fr;gap:12px;align-items:center;padding:14px 20px;border-top:1px solid var(--line);font-size:16px}
+.row:first-child{border-top:0}.row .t,.row .r{font-family:var(--font-mono);font-size:15px}.row .t{color:var(--mute);font-size:14px}
+.foot{justify-content:flex-start!important;gap:40px}
+</style></head><body>
+<section class="tg-slide">
+<div class="top"><img class="tg-logo" src="../logo/logo.svg" alt="tollgate"><span>How it decides · 3 / 10</span></div>
+<div class="mid"><div><h1>Rules first.<br><span class="m">Models only when unsure.</span></h1><p class="lead">Cheap deterministic checks decide most requests. A small local model only looks at what the rules cannot decide.</p></div>
+<div class="tg-card">
+<div class="row"><span class="t">14:02:11</span><span><span class="tg-badge tg-badge--allow tg-badge--lg">allow</span></span><span>Summarise the Q3 memo</span></div>
+<div class="row"><span class="t">14:02:14</span><span><span class="tg-badge tg-badge--redact tg-badge--lg">redact</span></span><span class="r">pii.iban</span></div>
+<div class="row"><span class="t">14:02:19</span><span><span class="tg-badge tg-badge--block tg-badge--lg">block</span></span><span class="r">decode.rescan</span></div>
+<div class="row"><span class="t">14:02:31</span><span><span class="tg-badge tg-badge--kill tg-badge--lg">kill session</span></span><span class="r">canaries.in_output</span></div>
+</div></div>
+<div class="foot"><div class="tg-metric"><div class="l">Tier 0 · rules · p50</div><b class="v">0.48 ms</b></div><div class="tg-metric"><div class="l">Tier 1 · Llama Guard · p50</div><b class="v">49 ms</b></div><div class="tg-metric"><div class="l">Red-team bypass rate</div><b class="v">15.7 %</b></div></div>
+</section></body></html>

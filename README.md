@@ -1,6 +1,8 @@
 # Tollgate — AI Control Layer
 
-<!-- TODO(submit): one-line tagline + docs/screenshots/overview.png -->
+**One policy file between your agents and their models: deterministic checks in under a millisecond, local-model judgement where it is needed, budgets, a hash-chained audit log, and a test suite that attacks itself.**
+
+![Tollgate dashboard: overview](docs/screenshots/overview.png)
 
 Tollgate is a drop-in control layer for AI traffic. It is an OpenAI-compatible HTTP proxy: point any agent, app or framework at `http://localhost:8787/v1` instead of the model, and every request and response passes through a policy defined in one file, `policy.yaml`. The policy is hot-reloaded; invalid edits are rejected and the last good version stays active.
 
@@ -63,7 +65,9 @@ Full setup notes and troubleshooting: [`docs/SETUP.md`](docs/SETUP.md).
 
 ## Architecture
 
-<!-- TODO(M9): add docs/architecture.png exported from docs/architecture.mmd; keep the ASCII version for terminals -->
+![Tollgate architecture](docs/architecture.png)
+
+Source: [`docs/architecture.mmd`](docs/architecture.mmd) (Mermaid). The same pipeline as text:
 
 ```
  agent / app ──bearer key──▶ ┌────────────────────────── Tollgate :8787 ──────────────────────────┐
@@ -258,7 +262,11 @@ Committed results in `tests/cases/generated/`: two `*-fixed.yaml` files (50 + 33
 
 ## Dashboard
 
-<!-- TODO(M5): screenshots in docs/screenshots/ -->
+| Security events | Red team |
+|---|---|
+| ![Security events](docs/screenshots/security.png) | ![Red team](docs/screenshots/redteam.png) |
+| **Coverage** | **Playground** |
+| ![Coverage](docs/screenshots/coverage.png) | ![Playground](docs/screenshots/playground.png) |
 
 `http://localhost:3000`, reading the gateway's `/admin/*` endpoints and the `/admin/events` SSE stream.
 
@@ -363,9 +371,8 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 
 ## AI and third-party use (disclosure)
 
-<!-- TODO(M9): keep this exact and complete; the rules require disclosure and the team must be able to explain every part -->
 
-**Implementation assistance:** [Claude Code](https://claude.com/claude-code) (Anthropic) was used for planning, scaffolding, code generation, test generation and review during the hackathon: Claude Opus 5.5 (main session: gateway, controls, test suites, acceptance runs, review) and Claude Sonnet (subagents: dashboard, test fixtures, red-team seeds, UI review). <!-- TODO(Dan): confirm which model wrote the planning documents --> All code was reviewed and is explainable by the author.
+**Implementation assistance:** [Claude Code](https://claude.com/claude-code) (Anthropic) was used for planning, scaffolding, code generation, test generation and review during the hackathon: Claude Opus 5.5 (main session: gateway, controls, test suites, acceptance runs, review; subagents: the four hardening-pass tracks) and Claude Sonnet (subagents: dashboard, test fixtures, red-team seeds, UI review, code review of the hardening pass, slides and screenshots). <!-- TODO(Dan): confirm which model wrote the planning documents --> All code was reviewed and is explainable by the author.
 
 **Local models (via Ollama):**
 
@@ -378,6 +385,8 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 **Attack corpora:** seed prompts in `tests/redteam/seeds/` are adapted from [garak](https://github.com/NVIDIA/garak) (Apache 2.0) and [promptfoo](https://github.com/promptfoo/promptfoo) (MIT), with attribution in each file. The historical-attack feed entries cite their public sources (JFrog, ReversingLabs, Oligo, Wiz, NVD, The Hacker News, Aim Security, Invariant Labs / Cloud Security Alliance).
 
 **Referenced but not used in the critical path:** Presidio (MIT), ModelScan (Apache 2.0), Prompt Guard 2 (Llama licence), LlamaFirewall paper (Meta). LLM Guard (archived July 2026) and LiteLLM enterprise features were deliberately not used; the pipeline and budget engine are written from scratch in TypeScript.
+
+**Docs tooling (run once, not dependencies):** Marp CLI (MIT) rendered `docs/slides.pdf` from `docs/SLIDES.md`; mermaid-cli (MIT) rendered `docs/architecture.png` from `docs/architecture.mmd`.
 
 **npm dependencies:**
 
@@ -396,4 +405,4 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 
 ## Licence
 
-MIT. <!-- TODO(M0): add LICENSE file -->
+MIT, see [LICENSE](LICENSE).

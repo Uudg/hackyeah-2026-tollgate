@@ -1,0 +1,36 @@
+<!doctype html><html data-theme="night"><head><meta charset="utf-8"><link rel="stylesheet" href="../tokens.css"><link rel="stylesheet" href="../components.css"><style>
+html,body{margin:0;background:var(--ground)}
+.slide{width:1280px;height:720px;box-sizing:border-box;padding:56px 64px;display:grid;grid-template-rows:auto 1fr auto;gap:32px;background:var(--ground);color:var(--ink)}
+.top{display:flex;justify-content:space-between;align-items:center}
+.top img{height:36px}
+.kicker{font:700 13px/1 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted)}
+.main{display:grid;grid-template-columns:1.05fr 1fr;gap:48px;align-items:center}
+h1{margin:0 0 24px}
+.lines{display:grid;gap:14px;font:400 24px/1.35 var(--font-sans);color:var(--ink)}
+.lines b{color:var(--brand);font-weight:700}
+.frame{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:24px;display:grid;gap:14px}
+.ev{display:grid;grid-template-columns:auto 132px 1fr;gap:12px;align-items:center}
+.ev .tg-rule{height:28px;font-size:14px}
+.ts{font:500 14px/1 var(--font-mono);color:var(--ink-muted)}
+.foot{display:flex;justify-content:space-between;align-items:center}
+.foot .tg-stripe{width:240px}
+.n{font:500 14px/1 var(--font-mono);color:var(--ink-muted)}
+</style></head><body class="tg">
+<section class="slide">
+ <div class="top"><img src="../logo/tollgate-lockup-night.svg" alt="Tollgate"><span class="kicker">How it decides</span></div>
+ <div class="main">
+  <div>
+   <h1 class="display">Rules first.<br>Models only when unsure.</h1>
+   <div class="lines"><span><b>Tier 0</b> rules, no AI: 0.48 ms</span><span><b>Tier 1</b> Llama Guard: 49 ms</span><span><b>Tier 2</b> local judge, only if tier 1 is unsure</span></div>
+  </div>
+  <div class="frame">
+   <div class="ev"><span class="ts">14:02:11</span><span class="tg-badge tg-badge--allow tg-badge--lg">allow</span><span class="tg-rule">none</span></div>
+   <div class="ev"><span class="ts">14:02:14</span><span class="tg-badge tg-badge--redact tg-badge--lg">redact</span><span class="tg-rule">pii.iban</span></div>
+   <div class="ev"><span class="ts">14:02:19</span><span class="tg-badge tg-badge--block tg-badge--lg">block</span><span class="tg-rule">decode.rescan</span></div>
+   <div class="ev"><span class="ts">14:02:31</span><span class="tg-badge tg-badge--kill tg-badge--lg">kill</span><span class="tg-rule">canaries.in_output</span></div>
+  </div>
+ </div>
+ <div class="foot"><div class="tg-stripe"></div><span class="n">03 / 10</span></div>
+</section>
+<script>document.documentElement.setAttribute('data-theme','night')</script>
+</body></html>

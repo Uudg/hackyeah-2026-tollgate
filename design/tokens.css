@@ -1,0 +1,56 @@
+/* Tollgate design tokens v3 (matches apps/dashboard/app/globals.css). Generated from tokens.json. */
+:root{
+  color-scheme:light;
+  --bg:#f4f5f6;
+  --panel:#ffffff;
+  --panel-hover:#f7f8f9;
+  --ink:#1b1e23;
+  --mute:#646b75;
+  --faint:#727984;
+  --line:#e1e4e8;
+  --line-strong:#cdd2d8;
+  --accent:#3f4fc4;
+  --accent-soft:#eceefb;
+  --allow:#1d7a48;
+  --allow-bg:#e4f3ea;
+  --allow-border:rgba(29,122,72,0.3);
+  --redact:#8a5a00;
+  --redact-bg:#fbefd2;
+  --redact-border:rgba(138,90,0,0.3);
+  --block:#b3261e;
+  --block-bg:#fae6e4;
+  --block-border:rgba(179,38,30,0.3);
+  --kill:#6a3fa3;
+  --kill-bg:#eee5f8;
+  --kill-border:rgba(106,63,163,0.3);
+  --canary:#ffd23f;
+  --canary-shade:#f0b400;
+  --canary-beak:#ff8a00;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-6:24px;
+  --space-10:40px;
+  --space-11:44px;
+  --space-14:56px;
+  --radius-badge:3px;
+  --radius-control:4px;
+  --radius-panel:6px;
+  --radius-card:10px;
+  --radius-mascot:10px;
+  --font-sans:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.slide-display{font-family:var(--font-sans);font-size:64px;line-height:1.04;font-weight:600;letter-spacing:-0.03em;}
+.slide-title{font-family:var(--font-sans);font-size:58px;line-height:1.05;font-weight:600;letter-spacing:-0.025em;}
+.slide-lead{font-family:var(--font-sans);font-size:20px;line-height:1.5;font-weight:400;}
+.slide-metric{font-family:var(--font-sans);font-size:30px;line-height:1.15;font-weight:600;letter-spacing:-0.02em;}
+.page-title{font-family:var(--font-sans);font-size:16px;line-height:1.3;font-weight:600;letter-spacing:-0.01em;}
+.tile-value{font-family:var(--font-sans);font-size:22px;line-height:1.27;font-weight:600;letter-spacing:-0.01em;}
+.panel-title{font-family:var(--font-sans);font-size:12px;line-height:1.4;font-weight:600;}
+.body{font-family:var(--font-sans);font-size:13px;line-height:1.45;font-weight:400;}
+.label{font-family:var(--font-sans);font-size:11px;line-height:1.4;font-weight:400;}
+.badge{font-family:var(--font-sans);font-size:11px;line-height:1.45;font-weight:500;}
+.data{font-family:var(--font-mono);font-size:11.5px;line-height:1.45;font-weight:400;}
+.data-slide{font-family:var(--font-mono);font-size:16px;line-height:1.4;font-weight:400;}

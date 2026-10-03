@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../tokens.css"><link rel="stylesheet" href="../components.css"><style>
+html,body{margin:0;background:var(--paper)}
+.s{width:1280px;height:720px;box-sizing:border-box;padding:40px 48px;display:grid;grid-template-columns:440px 1fr;grid-template-rows:auto 1fr auto;gap:0 48px;background:var(--paper)}
+.tg-rulehead{grid-column:1/-1}.tg-rulehead img{height:26px}
+.live{display:flex;gap:10px;align-items:center}.dot{width:10px;height:10px;background:var(--signal)}
+.mascot{align-self:center;padding-top:10px}
+.mascot svg{width:100%;height:auto}
+.feed{align-self:center}
+.feed .tg-table td{font-size:20px;padding:14px 12px 14px 0}
+.feed .tg-table .mono{font-size:20px}
+.foot{grid-column:1/-1;display:flex;gap:64px;border-top:2px solid var(--rule);padding-top:14px}
+</style></head><body class="tg"><section class="s">
+<div class="tg-rulehead"><img src="../logo/wordmark-light.svg" alt="Tollgate"><span class="live"><i class="dot"></i>LIVE · POLICY V12 · P-2B3A0E6545FD · ENFORCE</span></div>
+<div class="mascot"><svg class="tg-canary is-idle" viewBox="-24 0 144 120" aria-label="Tollgate canary">
+ <g class="arm"><rect x="34" y="79" width="80" height="10" rx="5" fill="var(--ink)"/><g fill="var(--paper)"><polygon points="58,79 64,79 60,89 54,89"/><polygon points="78,79 84,79 80,89 74,89"/><polygon points="98,79 104,79 100,89 94,89"/></g></g>
+ <rect x="24" y="63" width="14" height="51" rx="4" fill="var(--ink)"/>
+ <g class="bird">
+  <polygon points="17,52 8,47 9,57" fill="var(--canary-shade)"/>
+  <rect x="16" y="31" width="30" height="33" rx="10" fill="var(--canary)"/>
+  <path d="M16 44 H28 A5 5 0 0 1 28 54 H16 Z" fill="var(--canary-shade)"/>
+  <polygon points="46,41 53.5,44.5 46,48" fill="var(--canary-beak)"/>
+  <circle class="e-open" cx="38.5" cy="41" r="2.4" fill="#0b0b0b"/>
+  <path class="e-happy" d="M35.9 42 q2.6 -3.4 5.2 0" stroke="#0b0b0b" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <g class="e-x" stroke="#0b0b0b" stroke-width="1.7" stroke-linecap="round"><line x1="36.3" y1="38.8" x2="40.7" y2="43.2"/><line x1="40.7" y1="38.8" x2="36.3" y2="43.2"/></g>
+  <line class="brow" x1="34.5" y1="35.4" x2="42" y2="37.4" stroke="#0b0b0b" stroke-width="2" stroke-linecap="round"/>
+  <rect class="bar" x="29" y="37.5" width="17" height="7" fill="#0b0b0b"/>
+ </g>
+</svg>
+</div>
+<div class="feed"><table class="tg-table"><tbody>
+<tr><td class="mono muted">14:02:31</td><td><span class="tg-badge tg-badge--kill tg-badge--lg">kill</span></td><td class="mono">canaries.in_output</td></tr>
+<tr><td class="mono muted">14:02:19</td><td><span class="tg-badge tg-badge--block tg-badge--lg">block</span></td><td class="mono">decode.rescan</td></tr>
+<tr><td class="mono muted">14:02:14</td><td><span class="tg-badge tg-badge--redact tg-badge--lg">redact</span></td><td class="mono">pii.iban</td></tr>
+<tr><td class="mono muted">14:02:11</td><td><span class="tg-badge tg-badge--allow tg-badge--lg">allow</span></td><td class="mono muted">none</td></tr>
+</tbody></table></div>
+<div class="foot"><div class="tg-metric"><b>94</b><span>posture score (example)</span></div><div class="tg-metric"><b class="is-signal">37</b><span>blocked, last 5 min (example)</span></div><div class="tg-metric"><b>0.48 ms</b><span>tier 0 p50</span></div></div>
+</section><script>
+document.documentElement.setAttribute('data-theme','light');
+const s=["idle","allow","redact","block","kill"];let i=0;const svg=document.querySelector('.tg-canary');
+setInterval(()=>{const p=s[i];i=(i+1)%s.length;if(p==="kill"){svg.setAttribute('class','tg-canary is-idle no-anim');svg.getBoundingClientRect();}svg.setAttribute('class','tg-canary is-'+s[i]);},1600);
+</script></body></html>

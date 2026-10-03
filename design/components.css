@@ -1,0 +1,59 @@
+/* Tollgate components (v3). Values come from tokens.css; they match apps/dashboard/app/globals.css. */
+.tg { font-family: var(--font-sans); color: var(--ink); background: var(--bg); font-size: 13px; line-height: 1.45; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+.tg .mono, .tg-mono { font-family: var(--font-mono); font-size: 11.5px; }
+
+/* Decision badge, same as the dashboard's DecisionBadge */
+.tg-badge { display: inline-flex; align-items: center; border: 1px solid; border-radius: var(--radius-badge); padding: 1px 6px; font-size: 11px; font-weight: 500; line-height: 16px; white-space: nowrap; }
+.tg-badge--allow  { color: var(--allow);  background: var(--allow-bg);  border-color: var(--allow-border); }
+.tg-badge--redact { color: var(--redact); background: var(--redact-bg); border-color: var(--redact-border); }
+.tg-badge--block  { color: var(--block);  background: var(--block-bg);  border-color: var(--block-border); }
+.tg-badge--kill   { color: var(--kill);   background: var(--kill-bg);   border-color: var(--kill-border); }
+.tg-badge--monitor { border-style: dashed; background: transparent; }
+.tg-badge--lg { font-size: 15px; line-height: 20px; padding: 2px 8px; border-radius: var(--radius-control); }
+
+/* Panel and tile */
+.tg-panel { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.tg-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+.tg-panel > header h2 { margin: 0; font-size: 12px; font-weight: 600; }
+.tg-panel > .body { padding: 12px; }
+.tg-tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 10px 12px; }
+.tg-tile .l { font-size: 11px; color: var(--mute); }
+.tg-tile .v { margin-top: 2px; font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em; }
+.tg-tile .s { margin-top: 2px; font-size: 11px; color: var(--mute); }
+.tg-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tg-tbl th { text-align: left; font-weight: 500; color: var(--mute); padding: 6px 10px; border-bottom: 1px solid var(--line-strong); }
+.tg-tbl td { padding: 5px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tg-tbl tbody tr:hover { background: var(--panel-hover); }
+
+/* Slides */
+.tg-slide { width: 1280px; height: 720px; box-sizing: border-box; background: var(--bg); padding: 44px 56px; display: grid; grid-template-rows: auto 1fr auto; color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.tg-slide .top, .tg-slide .foot { display: flex; justify-content: space-between; align-items: center; color: var(--mute); font-size: 14px; }
+.tg-slide h1 { margin: 0; font-size: 58px; line-height: 1.05; font-weight: 600; letter-spacing: -.025em; }
+.tg-slide h1 .m { color: var(--mute); }
+.tg-slide .lead { margin: 20px 0 0; font-size: 20px; line-height: 1.5; color: var(--mute); max-width: 30em; }
+.tg-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; }
+.tg-metric { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 14px 18px; min-width: 180px; }
+.tg-metric .l { font-size: 13px; color: var(--mute); }
+.tg-metric .v { display: block; margin-top: 2px; font-size: 30px; font-weight: 600; letter-spacing: -.02em; }
+.tg-logo { height: 24px; width: auto; display: block; }
+
+/* Canary mascot: <svg class="tg-canary is-idle"> with .arm, .bird, .bar, .e-open, .e-happy, .e-x, .brow */
+.tg-canary { overflow: visible; }
+.tg-canary .arm { transform-origin: 40px 84px; transition: transform .42s cubic-bezier(.2,.9,.25,1.15); }
+.tg-canary .bird { transform-origin: 31px 64px; transition: transform .35s cubic-bezier(.2,.9,.25,1.15); }
+.tg-canary .bar { transform-origin: 29px 0; transform: scaleX(0); transition: transform .22s ease-out; }
+.tg-canary .e-open, .tg-canary .e-happy, .tg-canary .e-x, .tg-canary .brow { opacity: 0; }
+.tg-canary.is-idle .e-open, .tg-canary.is-redact .e-open, .tg-canary.is-block .e-open { opacity: 1; }
+.tg-canary.is-allow .arm { transform: rotate(-55deg); }
+.tg-canary.is-allow .bird { animation: tg-hop .45s ease-out 1; }
+.tg-canary.is-allow .e-happy { opacity: 1; }
+.tg-canary.is-redact .bar { transform: scaleX(1); }
+.tg-canary.is-block .arm { animation: tg-shake .3s ease-in 1; }
+.tg-canary.is-block .bird { transform: scale(1.08); }
+.tg-canary.is-block .brow { opacity: 1; }
+.tg-canary.is-kill .bird { transform: translate(-25px,14px) rotate(-165deg); transition: transform .55s cubic-bezier(.55,0,.85,.35); }
+.tg-canary.is-kill .e-x { opacity: 1; }
+.tg-canary.no-anim, .tg-canary.no-anim * { transition: none !important; animation: none !important; }
+@keyframes tg-hop { 0%,100% { transform: none } 45% { transform: translateY(-6px) } }
+@keyframes tg-shake { 0%,100% { transform: none } 25% { transform: translateX(-3px) } 55% { transform: translateX(3px) } 80% { transform: translateX(-1px) } }
+@media (prefers-reduced-motion: reduce) { .tg-canary *, .tg-canary { transition: none !important; animation: none !important; } }

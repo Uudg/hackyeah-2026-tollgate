@@ -1,0 +1,46 @@
+<!doctype html><html data-theme="night"><head><meta charset="utf-8"><link rel="stylesheet" href="../tokens.css"><link rel="stylesheet" href="../components.css"><style>
+html,body{margin:0;background:var(--ground)}
+.live{width:1280px;height:720px;box-sizing:border-box;padding:40px 48px;display:grid;grid-template-columns:360px 1fr;grid-template-rows:auto 1fr;gap:28px 40px;background:var(--ground);color:var(--ink)}
+.hd{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
+.hd img{height:40px}
+.pol{display:flex;gap:10px;align-items:center;font:500 16px/1 var(--font-mono);color:var(--ink-muted)}
+.dot{width:10px;height:10px;border-radius:var(--radius-pill);background:var(--brand)}
+.side{display:grid;gap:20px;align-content:start}
+.score .tg-tile__value{font-size:88px;line-height:.9}
+.flow{display:grid;grid-template-rows:auto 1fr;gap:20px;min-width:0}
+.gate{position:relative;height:150px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden}
+.gate .post{position:absolute;left:36%;top:28px;width:22px;height:110px;border-radius:var(--radius-md);background:var(--ink)}
+.gate .arm{position:absolute;left:calc(36% + 6px);top:62px;width:44%;height:22px;border-radius:var(--radius-md);background:repeating-linear-gradient(115deg,var(--brand) 0 56px,var(--surface) 56px 72px);transform:rotate(-9deg);transform-origin:0 50%}
+.gate .bird{position:absolute;left:calc(36% + 6px + 44% - 52px);top:12px;width:22px;height:22px;border-radius:var(--radius-pill);background:var(--canary)}
+.pk{position:absolute;top:96px;height:30px;padding:0 10px;display:flex;align-items:center;border-radius:var(--radius-sm);font:600 14px/1 var(--font-mono)}
+.pk.a{left:8%;background:var(--allow-soft);color:var(--allow)}
+.pk.b{left:20%;background:var(--block-soft);color:var(--block)}
+.pk.c{left:80%;background:var(--allow-soft);color:var(--allow)}
+.feed{display:grid;gap:10px;align-content:start}
+.row{display:grid;grid-template-columns:92px 150px 1fr 80px;gap:16px;align-items:center;padding:10px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md)}
+.row .ms{text-align:right}
+.row .ts,.row .ms{font:500 18px/1 var(--font-mono);color:var(--ink-muted)}
+
+.live .tg-tile__label{font-size:14px}
+.live .tg-tile__sub{font-size:16px}
+.row .tg-rule{height:34px;font-size:20px;background:var(--surface-raised)}
+</style></head><body class="tg">
+<section class="live">
+ <div class="hd"><img src="../logo/tollgate-lockup-night.svg" alt="Tollgate"><div class="pol"><span class="dot"></span>live · policy v12 · p-2b3a0e6545fd · enforce</div></div>
+ <div class="side">
+  <div class="tg-tile score"><span class="tg-tile__label">Posture score</span><span class="tg-tile__value">94<small>/ 100</small></span><span class="tg-tile__sub">example value</span></div>
+  <div class="tg-tile"><span class="tg-tile__label">Blocked, last 5 min</span><span class="tg-tile__value">37</span><span class="tg-tile__sub">12 redacted · 1 session killed</span></div>
+  <div class="tg-tile"><span class="tg-tile__label">Budget, demo-agent</span><span class="tg-tile__value">42<small>%</small></span><div class="tg-bar"><i style="width:42%"></i></div></div>
+ </div>
+ <div class="flow">
+  <div class="gate"><span class="pk a">chat</span><span class="pk b">inject</span><div class="post"></div><div class="arm"></div><div class="bird"></div><span class="pk c">chat</span></div>
+  <div class="feed">
+   <div class="row"><span class="ts">14:02:31</span><span class="tg-badge tg-badge--kill tg-badge--lg">kill</span><span class="tg-rule">canaries.in_output</span><span class="ms">0.7 ms</span></div>
+   <div class="row"><span class="ts">14:02:19</span><span class="tg-badge tg-badge--block tg-badge--lg">block</span><span class="tg-rule">decode.rescan</span><span class="ms">0.5 ms</span></div>
+   <div class="row"><span class="ts">14:02:14</span><span class="tg-badge tg-badge--redact tg-badge--lg">redact</span><span class="tg-rule">pii.iban</span><span class="ms">0.5 ms</span></div>
+   <div class="row"><span class="ts">14:02:11</span><span class="tg-badge tg-badge--allow tg-badge--lg">allow</span><span class="tg-rule">none</span><span class="ms">51 ms</span></div>
+  </div>
+ </div>
+</section>
+<script>document.documentElement.setAttribute('data-theme','night')</script>
+</body></html>
