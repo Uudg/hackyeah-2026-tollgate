@@ -389,7 +389,7 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 ## AI and third-party use (disclosure)
 
 
-**Implementation assistance:** [Claude Code](https://claude.com/claude-code) (Anthropic) was used for planning, scaffolding, code generation, test generation and review during the hackathon: Claude Opus 5.5 (main session: gateway, controls, test suites, acceptance runs, review; subagents: the four hardening-pass tracks) and Claude Sonnet (subagents: dashboard, test fixtures, red-team seeds, UI review, code review of the hardening pass, slides and screenshots). <!-- TODO(Dan): confirm which model wrote the planning documents --> All code was reviewed and is explainable by the author.
+**Implementation assistance:** [Claude Code](https://claude.com/claude-code) (Anthropic) was used for planning, scaffolding, code generation, test generation and review during the hackathon: Claude Opus 5.5 (main session: gateway, controls, test suites, acceptance runs, review; subagents: the four hardening-pass tracks) and Claude Sonnet (subagents: dashboard, test fixtures, red-team seeds, UI review, code review of the hardening pass, slides and screenshots). The planning documents (`HANDOFF.md`, `docs/SPEC.md`, `docs/PLAN.md`, `docs/CHECKLIST.md`, `CLAUDE.md`) were written with Claude in the Claude desktop app (Cowork): Claude Sonnet 5.5, with Claude Fable 5.1 subagents drafting files. The design system in `design/` was made there with Claude Opus 5.5. All code was reviewed and is explainable by the author.
 
 **Local models (via Ollama):**
 
