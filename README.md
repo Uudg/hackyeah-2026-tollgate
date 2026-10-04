@@ -255,8 +255,25 @@ The attempt count grew because encoding mutators now also apply to response seed
 What the loop found and what changed:
 - M7 (SPEC §16, D17–D20): leetspeak, split string fragments and payloads split over several user turns beat tier 0, so these are now decoded and rescanned; URL-encoding blinded the classifier, so tiers 1–2 now also read the decoded text; soft "show me your initial instructions" requests got through, so the prompt-leak signature was widened. The sysprompt "before" figure also includes a harness bug (the system prompt was shorter than the 20-word minimum), fixed in the runner.
 - Hardening pass (D23–D27): output-side decode-and-rescan for secrets, PII, canaries and the system prompt; case-insensitive IBAN and AWS keys; PII and secrets on joined user turns; 30+ input-format and normalization fixes; two new injection heuristics and wider feed entries; output-path fixes for links, tool names and extra message fields. An adversarial review then found five quadratic regexes (one 40 kB field froze the gateway for seconds) and several false positives; all fixed with tests (`tests/hardening-review.test.ts`).
+- Depth-2 run (D28): stacked obfuscation. Decoded text is now normalized and run through the leetspeak, fragment and URL rewrites again; output links are read after homoglyph folding; joined fragments are checked for exfil links; leetspeak output is checked for PII; a card number right after another number is found. 16 fixtures in `tests/cases/redteam-depth2.yaml`, 4 of them allow cases for false positives.
 
-Committed results in `tests/cases/generated/`: two `*-fixed.yaml` files (50 + 33 former bypasses that now pass, kept as regression tests) and one `*-open.yaml` (160 bypasses still open, each with a `skip:` reason). The open cases are not counted in the `bun test` totals: the summary prints them on their own line, and `TOLLGATE_BACKLOG=1 bun test` runs them. They are mostly paraphrase-level jailbreaks the 1B classifier misses (105), request-side tool intents whose tool call would still be checked on the response path (43), and output values split into fragments or obfuscated character by character (12). Remove a `skip:` line to turn a case into a regression test once a fix lands.
+**Depth 2** (every ordered pair of mutators, 12 922 attempts, same seeds and models, ~63 min): **12.1 %** bypass rate (1 569) before the depth-2 fixes.
+
+| control | attempts | bypasses | rate | caught after D28 (deterministic replay) |
+|---|---:|---:|---:|---:|
+| prompt_injection | 3952 | 501 | 12.7 % | 25 |
+| signatures | 2888 | 334 | 11.6 % | 17 |
+| tool_calls | 1368 | 309 | 22.6 % | 1 |
+| content_safety | 1368 | 185 | 13.5 % | 5 |
+| sysprompt | 556 | 104 | 18.7 % | 67 |
+| link_exfil | 410 | 69 | 16.8 % | 51 |
+| pii | 1633 | 36 | 2.2 % | 20 |
+| secrets | 747 | 31 | 4.2 % | 7 |
+| **total** | **12 922** | **1 569** | **12.1 %** | **193 → 10.6 %** |
+
+The "after" column replays the 1 569 bypassing inputs through the fixed code with tier 0 and the output path only; attempts that were blocked before stay blocked, so 1 376 / 12 922 = 10.6 % is the deterministic upper bound. About a quarter of the depth-2 bypasses (383) were not misses: Ollama was saturated by 4 workers, tier 1/2 timed out and `semantic.fail_mode: open` let them through (`policy.strict.yaml` fails closed instead). The rest of what is left: request-side tool intents (the tool call is still checked on the response path), paraphrase-level jailbreaks the 1B classifier misses, and chains where the second mutator corrupts an encoded value (base64 then leetspeak) so a reader cannot decode it either.
+
+Committed results in `tests/cases/generated/`: three `*-fixed.yaml` files (50 + 33 + 36 former bypasses that now pass, kept as regression tests) and two `*-open.yaml` files (154 from depth 1 and a 164-case sample of depth 2, each with a `skip:` reason). The open cases are not counted in the `bun test` totals: the summary prints them on their own line, and `TOLLGATE_BACKLOG=1 bun test` runs them. Remove a `skip:` line to turn a case into a regression test once a fix lands.
 
 ---
 
