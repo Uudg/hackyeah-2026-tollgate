@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { CanaryHead, useCanaryReaction } from "./Canary";
 import { LiveProvider, useLive } from "./Live";
 import { ScrollX, cn } from "./ui";
 
@@ -77,6 +78,19 @@ function Toasts() {
   );
 }
 
+/** Canary head + wordmark. The face mirrors the latest decision, then goes back to idle. */
+function Logo() {
+  const { decisions } = useLive();
+  const latest = decisions[0];
+  const state = useCanaryReaction(latest?.id, latest?.decision);
+  return (
+    <Link href="/" className="relative inline-flex items-center gap-1.5 text-[14px] font-semibold lowercase tracking-tight before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-[''] md:before:hidden">
+      <CanaryHead state={state} className="h-5 w-auto shrink-0" />
+      <span>tollgate</span>
+    </Link>
+  );
+}
+
 function TopBar() {
   const path = usePathname();
   const { pendingApprovals } = useLive();
@@ -84,7 +98,7 @@ function TopBar() {
   return (
     <header className="sticky top-0 z-40 border-b border-line-strong bg-panel">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-0 px-4 py-1.5 max-md:pb-0">
-        <Link href="/" className="relative text-[14px] font-semibold tracking-tight before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-[''] md:before:hidden">Tollgate</Link>
+        <Logo />
         <div className="order-3 -mx-4 w-[calc(100%+2rem)] md:order-none md:mx-0 md:w-auto">
         <ScrollX>
         <nav className="flex gap-0.5 px-3 md:px-0" aria-label="Primary">

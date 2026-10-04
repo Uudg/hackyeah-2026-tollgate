@@ -5,6 +5,7 @@ import type { DecisionRecord } from "@tollgate/policy";
 import { api } from "@/lib/gateway";
 import { useAsync, useNow } from "@/lib/hooks";
 import { fmtInt, fmtMsUnit, fmtPct, fmtTime, fmtUsd, relTime } from "@/lib/format";
+import { Canary } from "./Canary";
 import { useLive } from "./Live";
 import { DecisionBadge, Empty, ErrorNote, Loading, PageHeader, Panel, ScrollX, Tile, cn } from "./ui";
 import { HBars, LatencyBars, RatioBar, StackedBars, type Bucket } from "./charts";
@@ -137,7 +138,7 @@ export default function Overview() {
           </ul>
         </Panel>
         <Panel title="Live decisions" actions={<Link href="/security" className="inline-flex text-[11px] text-accent underline max-md:min-h-10 max-md:items-center">All events</Link>} bodyClass="p-0">
-          {latest.length === 0 ? <Empty>Waiting for traffic.</Empty> : (
+          {latest.length === 0 ? <Empty><Canary state="idle" className="mx-auto mb-1.5 block w-16" />Waiting for traffic.</Empty> : (
             <ScrollX className="max-h-[300px] overflow-y-auto">
               <table className="tbl">
                 <tbody>

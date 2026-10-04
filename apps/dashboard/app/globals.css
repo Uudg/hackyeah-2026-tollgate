@@ -16,6 +16,8 @@
   --redact: #8a5a00;      --redact-bg: #fbefd2;
   --block: #b3261e;       --block-bg: #fae6e4;
   --kill: #6a3fa3;        --kill-bg: #eee5f8;
+  /* the canary (design/mascot) only */
+  --canary: #ffd23f;      --canary-shade: #f0b400;  --canary-beak: #ff8a00;
 }
 
 @theme inline {
@@ -70,7 +72,32 @@ body {
 }
 
 @keyframes flash { from { background: var(--accent-soft); } to { background: var(--panel); } }
+@keyframes tg-hop { 0%,100% { transform: none } 45% { transform: translateY(-6px) } }
+@keyframes tg-shake { 0%,100% { transform: none } 25% { transform: translateX(-3px) } 55% { transform: translateX(3px) } 80% { transform: translateX(-1px) } }
 @layer components {
+/* ---- canary mascot (design/components.css): <svg class="tg-canary is-idle"> ---- */
+.tg-canary { overflow: visible; }
+.tg-canary .arm { transform-origin: 40px 84px; transition: transform .42s cubic-bezier(.2,.9,.25,1.15); }
+.tg-canary .bird { transform-origin: 31px 64px; transition: transform .35s cubic-bezier(.2,.9,.25,1.15); }
+.tg-canary .bar { transform-origin: 29px 0; transform: scaleX(0); transition: transform .22s ease-out; }
+.tg-canary .e-open, .tg-canary .e-happy, .tg-canary .e-x, .tg-canary .brow { opacity: 0; }
+.tg-canary.is-idle .e-open, .tg-canary.is-redact .e-open, .tg-canary.is-block .e-open { opacity: 1; }
+.tg-canary.is-allow .arm { transform: rotate(-55deg); }
+.tg-canary.is-allow .bird { animation: tg-hop .45s ease-out 1; }
+.tg-canary.is-allow .e-happy { opacity: 1; }
+.tg-canary.is-redact .bar { transform: scaleX(1); }
+.tg-canary.is-block .arm { animation: tg-shake .3s ease-in 1; }
+.tg-canary.is-block .bird { transform: scale(1.08); }
+.tg-canary.is-block .brow { opacity: 1; }
+.tg-canary.is-kill .bird { transform: translate(-25px,14px) rotate(-165deg); transition: transform .55s cubic-bezier(.55,0,.85,.35); }
+.tg-canary.is-kill .e-x { opacity: 1; }
+.tg-canary.no-anim, .tg-canary.no-anim * { transition: none !important; animation: none !important; }
+/* header head: the face only, no movement */
+.tg-head .e-happy, .tg-head .e-x, .tg-head .brow, .tg-head .bar { opacity: 0; }
+.tg-head.is-allow .e-open, .tg-head.is-kill .e-open { opacity: 0; }
+.tg-head.is-allow .e-happy, .tg-head.is-kill .e-x, .tg-head.is-block .brow, .tg-head.is-redact .bar { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .tg-canary *, .tg-canary { transition: none !important; animation: none !important; } }
+
 /* ---- console primitives ---- */
 .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 .tbl th { text-align: left; font-weight: 500; color: var(--mute); padding: 6px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; background: var(--panel); position: sticky; top: 0; }

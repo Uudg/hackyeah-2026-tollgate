@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/gateway";
 import type { ChatMessage, PlaygroundResult } from "@/lib/contract";
 import { errMsg, fmtMs } from "@/lib/format";
+import { Canary, useCanaryReaction } from "./Canary";
 import { useLive } from "./Live";
 import { DecisionBadge, Chip, ErrorNote, PageHeader, Panel, Toggle, cn } from "./ui";
 import { StageStrip } from "./StageStrip";
@@ -148,6 +149,9 @@ export default function Playground() {
               {turns.map((t, i) => (
                 <div key={t.id} className="space-y-2">
                   <div className="ml-auto w-fit max-w-[85%] rounded-md border border-line-strong bg-accent-soft px-3 py-1.5 text-[13px] break-words whitespace-pre-wrap">{t.user}</div>
+                  <div className={cn(i === lastIdx && "flex flex-col gap-2 lg:flex-row lg:items-start")}>
+                  {i === lastIdx && <CanaryPanel result={t.result} />}
+                  <div className="min-w-0 flex-1 space-y-2">
                   {t.pending && <div className="text-[12px] text-mute">Waiting for the gateway…</div>}
                   {t.error && <ErrorNote>{t.error}</ErrorNote>}
                   {t.result && (
@@ -163,6 +167,8 @@ export default function Playground() {
                       {i === lastIdx ? <StageStrip record={t.result.record} /> : <details><summary className="cursor-pointer text-[11px] text-mute">Stages</summary><div className="mt-1.5"><StageStrip record={t.result.record} /></div></details>}
                     </div>
                   )}
+                  </div>
+                  </div>
                 </div>
               ))}
               <div ref={endRef} />
@@ -186,5 +192,15 @@ export default function Playground() {
         </div>
       </div>
     </>
+  );
+}
+
+/** The canary acts out the latest verdict (the demo moment): right of the result on desktop, above it on mobile. */
+function CanaryPanel({ result }: { result?: PlaygroundResult }) {
+  const state = useCanaryReaction(result?.record.id, result?.record.decision);
+  return (
+    <div aria-hidden="true" className="w-[184px] shrink-0 self-center rounded-md border border-line bg-panel px-3 pt-2 pb-1 lg:order-2 lg:self-start">
+      <Canary state={state} className="block w-full" />
+    </div>
   );
 }
