@@ -40,6 +40,9 @@
     "setup": "bash ./scripts/setup.sh"
   },
   "devDependencies": {
+    "@tollgate/controls": "workspace:*",
+    "@tollgate/gateway": "workspace:*",
+    "@tollgate/policy": "workspace:*",
     "@types/bun": "latest",
     "openai": "^7.27.0",
     "typescript": "^5.9.0",
@@ -47,5 +50,5 @@
     "zod": "^4.1"
   },
   "trustedDependencies": [],
-  "_comment_deps": "Root holds toolchain deps plus yaml and zod for the test harness and openai for examples/openai-sdk.ts; runtime deps live in each workspace (apps/gateway: hono, yaml, zod; apps/dashboard: next, react, react-dom; packages/policy: zod, yaml)."
+  "_comment_deps": "Root holds the workspace packages (so tests/ and examples/ resolve @tollgate/* in a fresh clone), toolchain deps plus yaml and zod for the test harness and openai for examples/openai-sdk.ts; runtime deps live in each workspace (apps/gateway: hono, yaml, zod; apps/dashboard: next, react, react-dom; packages/policy: zod, yaml)."
 }

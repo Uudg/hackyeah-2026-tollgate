@@ -5,6 +5,9 @@
     "": {
       "name": "tollgate",
       "devDependencies": {
+        "@tollgate/controls": "workspace:*",
+        "@tollgate/gateway": "workspace:*",
+        "@tollgate/policy": "workspace:*",
         "@types/bun": "latest",
         "openai": "^7.27.0",
         "typescript": "^5.9.0",
