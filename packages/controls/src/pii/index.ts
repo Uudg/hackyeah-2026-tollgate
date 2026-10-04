@@ -3,7 +3,7 @@
 import type { PiiEntity } from "@tollgate/policy";
 import { makeHit, overlaps, type Action, type Hit } from "../types.ts";
 import { IBAN_RE, ibanMatchLength, NRB_RE, nrbMatchLength } from "./iban.ts";
-import { CARD_RE, cardValid } from "./card.ts";
+import { CARD_RE, cardSpan } from "./card.ts";
 import { PESEL_RE, peselValid } from "./pesel.ts";
 import { EMAIL_RE, EMAIL_OBFUSCATED_RE } from "./email.ts";
 import { PHONE_RE, phoneValid, IP_RE, ipValid } from "./phone.ts";
@@ -12,13 +12,14 @@ export { ibanValid } from "./iban.ts";
 export { luhnValid } from "./card.ts";
 export { peselValid } from "./pesel.ts";
 
-interface Detector { entity: PiiEntity; re: RegExp; accept: (m: string) => number }
+/** accept: the length of the value from the start of the match, or [offset, length] inside it; 0 / null = no value. */
+interface Detector { entity: PiiEntity; re: RegExp; accept: (m: string) => number | [number, number] | null }
 const all = (ok: (m: string) => boolean) => (m: string) => (ok(m) ? m.length : 0);
 
 const DETECTORS: Detector[] = [
   { entity: "iban", re: IBAN_RE, accept: ibanMatchLength },
   { entity: "iban", re: NRB_RE, accept: nrbMatchLength },
-  { entity: "card", re: CARD_RE, accept: all(cardValid) },
+  { entity: "card", re: CARD_RE, accept: cardSpan },
   { entity: "pesel", re: PESEL_RE, accept: all(peselValid) },
   { entity: "email", re: EMAIL_RE, accept: all(() => true) },
   { entity: "email", re: EMAIL_OBFUSCATED_RE, accept: all(() => true) },
@@ -34,9 +35,10 @@ export function scanPii(text: string, o: PiiOptions): Hit[] {
   for (const det of DETECTORS) {
     if (!o.entities.includes(det.entity)) continue;
     for (const m of text.matchAll(det.re)) {
-      const len = det.accept(m[0]);
+      const got = det.accept(m[0]);
+      const [off, len] = Array.isArray(got) ? got : [0, got ?? 0];
       if (len === 0) continue;
-      const start = m.index!, end = start + len;
+      const start = m.index! + off, end = start + len;
       if (overlaps(taken, start, end)) continue;
       taken.push([start, end]);
       hits.push(makeHit({

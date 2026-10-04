@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { DecisionRecord, TestCase } from "@tollgate/policy";
-import { deepSet, ROOT, startGateway, type TestGateway } from "./harness/gateway.ts";
+import { asciiJson, deepSet, ROOT, startGateway, type TestGateway } from "./harness/gateway.ts";
 import { loadCases } from "./harness/yaml.ts";
 import { missingModels, skipMessage } from "./harness/ollama.ts";
 import { printSummary, record, recordBacklog } from "./harness/report.ts";
@@ -35,7 +35,7 @@ async function send(c: TestCase): Promise<Sent> {
   const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${tg.keyFor(c.agent)}` };
   if (c.mock_upstream) {
     const mock = Object.fromEntries(Object.entries(c.mock_upstream).filter(([, v]) => v !== null));
-    headers["x-tollgate-echo"] = JSON.stringify(mock);
+    headers["x-tollgate-echo"] = asciiJson(mock);
   }
   for (const [k, v] of Object.entries(c.headers ?? {})) headers[k.toLowerCase()] = v;
   const body = { model: c.model, messages: buildMessages(c), ...(c.tools ? { tools: c.tools } : {}), ...(c.stream ? { stream: true } : {}) };

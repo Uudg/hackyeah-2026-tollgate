@@ -16,3 +16,16 @@ export function cardValid(m: string): boolean {
   const d = m.replace(/\D/g, "");
   return d.length >= 13 && d.length <= 19 && /^(?:[3-6]|2[2-7])/.test(d) && luhnValid(d);
 }
+
+/**
+ * [offset, length] of a valid card inside a match, or null. The regex is greedy, so a number written right before the
+ * card ("number 15 4111 1111 1111 1111") is pulled into the match; each later digit group is tried as the start too.
+ */
+export function cardSpan(m: string): [number, number] | null {
+  if (cardValid(m)) return [0, m.length];
+  for (const g of m.matchAll(/[ .-](?=\d)/g)) {
+    const off = g.index + 1;
+    if (cardValid(m.slice(off))) return [off, m.length - off];
+  }
+  return null;
+}

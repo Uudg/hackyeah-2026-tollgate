@@ -9,7 +9,7 @@ import { scanInjection } from "./inject/heuristics.ts";
 import { scanPickle, scanSignatures, type CompiledFeed } from "./signatures/index.ts";
 import { scanCanaries } from "./canary.ts";
 import { scanLinks } from "./linkExfil.ts";
-import { spoofedHosts } from "./urls.ts";
+import { extractUrls, spoofedHosts } from "./urls.ts";
 import { scanSysprompt } from "./sysprompt.ts";
 
 export interface ScanEnv {
@@ -120,7 +120,8 @@ export function scanOutputField(text: string, field: string, env: ScanEnv, o: Ou
   if (c.canaries.enabled) hits.push(...scanCanaries(t, env.canaries, { rule: canaryRule, action: c.canaries.action, field, extraOwasp }));
   // An encoded secret, PII value or canary in the output is still a leak (red-team finding): decode and rescan, and
   // redact (or kill, for a canary) the whole encoded span. Non-literal rewrites (leetspeak, rot13...) only invent values,
-  // so they are rescanned for a system-prompt leak only: that needs a long run of the real prompt's words.
+  // so they are rescanned for a system-prompt leak (that needs a long run of the real prompt's words) and, for
+  // leetspeak, PII.
   if (c.decode.enabled && c.decode.max_depth > 0) {
     for (const v of decodeVariants(t, c.decode.max_depth).variants) {
       const inner: Hit[] = [];
@@ -129,7 +130,16 @@ export function scanOutputField(text: string, field: string, env: ScanEnv, o: Ou
         if (c.secrets.enabled) inner.push(...scanSecrets(v.text, { action: secretAction, entropyMin: c.secrets.entropy_min, entropyMinLen: c.secrets.entropy_min_len, patterns: c.secrets.patterns, field, ignore, owasp: union(["LLM02"], extraOwasp) }));
         if (c.pii.enabled) inner.push(...scanPii(v.text, { entities: c.pii.entities, action: c.pii.action, field, owasp: union(["LLM02"], extraOwasp) }));
         if (c.canaries.enabled) inner.push(...scanCanaries(v.text, env.canaries, { rule: canaryRule, action: c.canaries.action, field, extraOwasp }));
+      } else if (v.encoding === "leet" && c.pii.enabled) {
+        // A leetspeak e-mail ("j4n.k0w4l5k1@3x4mpl3.c0m") is still the person's address; digit-only words (card, phone,
+        // PESEL) are never folded, so folding cannot invent those (depth-2 finding).
+        // Values that are already in the text as written were found above; only the ones folding revealed are new.
+        inner.push(...scanPii(v.text, { entities: c.pii.entities, action: c.pii.action, field, owasp: union(["LLM02"], extraOwasp) })
+          .filter((h) => !h.span || !t.includes(v.text.slice(h.span.start, h.span.end))));
       }
+      // An exfil link split into string fragments for the reader to join (depth-2 finding: payload_split). Encoded
+      // links never render, so only the joined fragments are checked.
+      if (v.encoding === "concat" && c.link_exfil.enabled) inner.push(...scanLinks(v.text, { action: c.link_exfil.action, allowDomains: c.link_exfil.allow_domains, minQueryLen: c.link_exfil.min_query_len, blockImages: c.link_exfil.block_images, field, sensitive: [], extraOwasp }));
       for (const h of inner) {
         hits.push({
           controlId: "decode", ruleId: "decode.rescan", action: h.action, owasp: union(h.owasp, ["LLM02"]),
@@ -143,13 +153,19 @@ export function scanOutputField(text: string, field: string, env: ScanEnv, o: Ou
   }
   if (c.link_exfil.enabled) {
     const sensitive = hits.filter((h) => h.span).map((h) => h.span!);
-    // Hosts are matched on the text before homoglyph folding: folding would turn "docs.exаmple.com" (Cyrillic а) into
-    // an allowlisted host. Folding is one code unit for one, so offsets are the same; if not, fall back to t.
+    // Links are read from the folded text, so a homoglyph scheme ("httрs://", Cyrillic р) is still a link (depth-2
+    // finding). Folding would also turn "docs.exаmple.com" (Cyrillic а) into an allowlisted host: a host whose
+    // characters changed in the fold is never trusted. Folding is one code unit for one, so offsets are the same.
     const unfolded = stripStrayMarks(stripInvisible(text.normalize("NFKC")).text).text;
-    // Hosts that only exist because of the fold are never trusted, even on the fallback path.
-    const linkText = unfolded.length === t.length ? unfolded : t;
     const spoofed = spoofedHosts(stripInvisible(text.normalize("NFKC")).text);
-    hits.push(...scanLinks(linkText, { action: c.link_exfil.action, allowDomains: c.link_exfil.allow_domains, minQueryLen: c.link_exfil.min_query_len, blockImages: c.link_exfil.block_images, field, sensitive, extraOwasp, spoofedHosts: spoofed }));
+    if (unfolded.length === t.length && unfolded !== t) {
+      for (const u of extractUrls(t)) {
+        const at = u.url.toLowerCase().indexOf(u.host.toLowerCase());
+        const end = at < 0 ? u.end : u.start + at + u.host.length;
+        if (unfolded.slice(u.start, end) !== t.slice(u.start, end)) spoofed.add(u.host.toLowerCase());
+      }
+    }
+    hits.push(...scanLinks(t, { action: c.link_exfil.action, allowDomains: c.link_exfil.allow_domains, minQueryLen: c.link_exfil.min_query_len, blockImages: c.link_exfil.block_images, field, sensitive, extraOwasp, spoofedHosts: spoofed }));
   }
   if (o.surface === "response" && c.sysprompt.enabled && o.system) {
     hits.push(...scanSysprompt(o.system, t, { action: c.sysprompt.action, ngram: c.sysprompt.ngram, overlapThreshold: c.sysprompt.overlap_threshold, minRun: c.sysprompt.min_run, field }));

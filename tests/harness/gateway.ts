@@ -79,11 +79,14 @@ export function deepSet(base: Record<string, unknown>, overrides: Record<string,
   return out;
 }
 
+/** JSON for an HTTP header: headers carry Latin-1 only, so every non-ASCII character is written as a \\u escape. */
+export const asciiJson = (v: unknown) => JSON.stringify(v).replace(/[\u0080-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
 /** POST a chat request as `agent` (default demo-agent). Returns status, headers and parsed JSON body. */
 export async function chat(tg: TestGateway, content: string | unknown[], o: { agent?: string; model?: string; headers?: Record<string, string>; tools?: unknown[]; echo?: unknown } = {}) {
   const messages = typeof content === "string" ? [{ role: "user", content }] : content;
   const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${tg.keyFor(o.agent ?? "demo-agent")}`, ...o.headers };
-  if (o.echo !== undefined) headers["x-tollgate-echo"] = JSON.stringify(o.echo);
+  if (o.echo !== undefined) headers["x-tollgate-echo"] = asciiJson(o.echo);
   const res = await fetch(`${tg.url}/v1/chat/completions`, {
     method: "POST", headers, body: JSON.stringify({ model: o.model ?? "llama3.2:3b", messages, ...(o.tools ? { tools: o.tools } : {}) }),
   });

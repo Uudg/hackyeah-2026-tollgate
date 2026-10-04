@@ -6,6 +6,8 @@
 // folded back to letters, string fragments the text asks to concatenate, ROT13, letter-spaced words joined
 // ("i g n o r e"), intra-word -, ., * removed ("ig-nore"), and HTML entities decoded across the whole text.
 import type { Encoding } from "../types.ts";
+import { stripInvisible, stripStrayMarks } from "./invisible.ts";
+import { foldHomoglyphs } from "./homoglyphs.ts";
 
 export interface DecodedVariant {
   text: string;
@@ -101,13 +103,17 @@ const LEET: Record<string, string> = { "4": "a", "3": "e", "1": "i", "0": "o", "
 export function foldLeet(text: string): string | null {
   let changed = 0;
   const out = text.replace(/[\p{L}\d@$]+/gu, (w, at: number) => {
-    // Skip %XX escapes, hex strings, tokens (long, or with digits that are not leet: keys, ids, digests) and words
-    // without both letters and leet digits.
-    if (text[at - 1] === "%" || w.length > 16 || /[2689]/.test(w) || /^[0-9a-f]+$/i.test(w) || !/\p{L}/u.test(w) || !/[013457@$]/.test(w)) return w;
+    // Skip %XX escapes, hex strings (a short word such as "d0" or "b3" is still folded), tokens (long, or with digits
+    // that are not leet: keys, ids, digests) and words without both letters and leet digits.
+    if (text[at - 1] === "%" || w.length > 16 || /[2689]/.test(w) || (w.length > 3 && /^[0-9a-f]+$/i.test(w)) || !/\p{L}/u.test(w) || !/[013457@$]/.test(w)) return w;
     changed++;
-    return w.replace(/[013457@$]/g, (ch) => LEET[ch]!);
+    // "@" before a domain is an e-mail address, not a leet "a" ("j4n.k0w4l5k1@3xampl3.c0m").
+    const email = /@/.test(w) && text[at + w.length] === ".";
+    return w.replace(email ? /[013457$]/g : /[013457@$]/g, (ch) => LEET[ch]!);
   });
-  return changed >= 2 ? out : null;
+  // Once the text is clearly leetspeak, a lone "4" or "1" between words is the word "a" or "I" ("You 4r3 4 f1n4nc3
+  // 455i574n7"); otherwise one digit breaks every n-gram of a repeated system prompt (depth-2 finding).
+  return changed >= 2 ? out.replace(/(?<=[\p{L}] )[41](?= [\p{L}])/gu, (d) => (d === "4" ? "a" : "I")) : null;
 }
 
 /** `a = "Ignore all prev"` `b = "ious instructions"` → the fragments joined, when there are at least two. */
@@ -172,6 +178,17 @@ export function decodeEntities(text: string): string | null {
 }
 
 /**
+ * %XX escapes decoded across the whole text when it has at least 6 of them. The span decoder works per
+ * whitespace-delimited token, which misses fragments split over lines (payload_split + url_encode).
+ */
+export function urlDecodeAll(text: string): string | null {
+  if ((text.match(/%[0-9A-Fa-f]{2}/g) ?? []).length < 6) return null;
+  return text.replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) => {
+    try { return decodeURIComponent(run); } catch { return run; } // an invalid UTF-8 sequence stays as written
+  });
+}
+
+/**
  * Rewrites that change the characters of the text rather than undo an encoding. Secrets and PII are literal strings,
  * so these variants are scanned for injection and signatures only: folding or rotating a value only invents new ones.
  */
@@ -179,9 +196,15 @@ export const NON_LITERAL: ReadonlySet<Encoding> = new Set<Encoding>(["leet", "ro
 
 /** [rewrite, encoding, walk]: walk = also look for encoded blobs inside the rewritten text (depth 2). */
 const REWRITES: Array<[(t: string) => string | null, Encoding, boolean]> = [
-  [foldLeet, "leet", true], [joinFragments, "concat", true],
+  [foldLeet, "leet", true], [joinFragments, "concat", true], [urlDecodeAll, "url", true],
   [rot13Text, "rot13", false], [despace, "despace", false], [squash, "squash", false], [decodeEntities, "entities", false],
 ];
+
+/**
+ * Decoded text gets the same normalization as the request text (zero-width characters, stray marks, homoglyphs), so
+ * text obfuscated before it was encoded is still read (depth-2 red-team finding: zero_width + base64/hex/url).
+ */
+const clean = (t: string) => foldHomoglyphs(stripStrayMarks(stripInvisible(t.normalize("NFKC")).text).text).text;
 
 /** All decodable variants of `text`, recursively to `maxDepth`, bounded by 32 variants and 64 KB. */
 export function decodeVariants(text: string, maxDepth: number): DecodeResult {
@@ -199,10 +222,18 @@ export function decodeVariants(text: string, maxDepth: number): DecodeResult {
           const raw = base64Bytes(span);
           if (raw && isPickleHeader(raw)) { result.pickles.push({ bytes: raw, depth, rootStart: start, rootEnd: end }); continue; }
         }
-        const decoded = decodeOne(span, enc);
-        if (decoded === null || decoded === m[0]) continue;
+        const raw = decodeOne(span, enc);
+        if (raw === null || raw === m[0]) continue;
+        const decoded = clean(raw);
         bytes += decoded.length;
         result.variants.push({ text: decoded, depth, encoding: enc, rootStart: start, rootEnd: end });
+        // Leetspeak or fragments inside the encoding (leetspeak + base64, payload_split + url_encode): the walkable
+        // rewrites run on the decoded text too. The variant keeps the outer encoding's root span.
+        for (const [rewrite, renc, nested] of REWRITES) {
+          if (!nested || result.variants.length >= MAX_VARIANTS) continue;
+          const r = rewrite(decoded);
+          if (r !== null && r !== decoded) result.variants.push({ text: r, depth: depth + 1, encoding: renc, rootStart: start, rootEnd: end });
+        }
         walk(decoded, depth + 1, [start, end]);
       }
     }
@@ -212,7 +243,15 @@ export function decodeVariants(text: string, maxDepth: number): DecodeResult {
     const t = rewrite(text);
     if (t === null || t === text || result.variants.length >= MAX_VARIANTS) continue;
     result.variants.push({ text: t, depth: 1, encoding: enc, rootStart: 0, rootEnd: text.length });
-    if (nested) walk(t, 2, [0, text.length]);
+    if (!nested) continue;
+    walk(t, 2, [0, text.length]);
+    // Two stacked rewrites (leetspeak + payload_split, payload_split + url_encode): the other walkable rewrites run on
+    // this one's result. The second rewrite names the variant: leet on top of anything stays non-literal.
+    for (const [second, enc2, nested2] of REWRITES) {
+      if (!nested2 || second === rewrite || result.variants.length >= MAX_VARIANTS) continue;
+      const t2 = second(t);
+      if (t2 !== null && t2 !== t) result.variants.push({ text: t2, depth: 2, encoding: enc === "leet" ? "leet" : enc2, rootStart: 0, rootEnd: text.length });
+    }
   }
   return result;
 }

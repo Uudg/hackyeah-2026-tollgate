@@ -47,9 +47,12 @@ export function runTool(call: ToolCall): string {
 
 interface Turn { status: number; decision: string; rule: string; tier: string; ms: number; message: Message | null; error: string | null }
 
+/** JSON for an HTTP header: headers carry Latin-1 only, so every non-ASCII character is written as a \\u escape. */
+const asciiJson = (v: unknown) => JSON.stringify(v).replace(/[\u0080-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
 async function send(messages: Message[], o: { echo?: unknown; session: string; tools?: boolean }): Promise<Turn> {
   const headers: Record<string, string> = { authorization: `Bearer ${KEY}`, "content-type": "application/json", "x-session-id": o.session };
-  if (o.echo !== undefined) headers["x-tollgate-echo"] = JSON.stringify(o.echo);
+  if (o.echo !== undefined) headers["x-tollgate-echo"] = asciiJson(o.echo);
   const t = performance.now();
   const res = await fetch(`${GATEWAY}/v1/chat/completions`, { method: "POST", headers, body: JSON.stringify({ model: MODEL, messages, ...(o.tools ? { tools: TOOLS } : {}) }) });
   const ms = performance.now() - t;
