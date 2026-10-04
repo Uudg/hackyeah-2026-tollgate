@@ -1,0 +1,123 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Tollgate</title><style>
+:root{--bg:#f4f5f6;--panel:#fff;--ink:#1b1e23;--mute:#646b75;--line:#e1e4e8;--line-strong:#cdd2d8;--accent:#3f4fc4;
+--allow:#1d7a48;--allow-bg:#e4f3ea;--allow-b:rgba(29,122,72,.3);--redact:#8a5a00;--redact-bg:#fbefd2;--redact-b:rgba(138,90,0,.3);
+--block:#b3261e;--block-bg:#fae6e4;--block-b:rgba(179,38,30,.3);--kill:#6a3fa3;--kill-bg:#eee5f8;--kill-b:rgba(106,63,163,.3);
+--canary:#ffd23f;--canary-shade:#f0b400;--canary-beak:#ff8a00;
+--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@page{size:1280px 720px;margin:0}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.s{width:1280px;height:720px;padding:40px 56px 36px;display:grid;grid-template-rows:auto 1fr auto;gap:22px;overflow:hidden;page-break-after:always;background:var(--bg)}
+.top,.foot{display:flex;justify-content:space-between;align-items:center;color:var(--mute);font-size:14px}
+.top img{height:24px;display:block}
+.body{min-height:0;display:grid;gap:32px}
+.body:not(.two):not(.two-even){align-content:center}
+.two{grid-template-columns:420px 1fr;align-items:center}
+.two-even{grid-template-columns:1fr 1fr;align-items:center}
+h1{margin:0;font-size:42px;line-height:1.08;font-weight:600;letter-spacing:-.025em}
+h1 .m,.m{color:var(--mute)}
+.lead{margin:14px 0 0;font-size:18px;line-height:1.5;color:var(--mute)}
+ul{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:12px}
+li{font-size:17px;line-height:1.45;padding-left:18px;position:relative}
+li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--line-strong)}
+li b{font-weight:600}
+code,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.shot{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;height:100%;max-height:560px;display:flex;align-items:center;justify-content:center;min-height:0}
+.shot img{max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:6px}
+.metrics{display:flex;gap:16px}
+.met{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;flex:1;min-width:0}
+.met .l{font-size:13px;color:var(--mute)}.met .v{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
+.b{display:inline-flex;align-items:center;border:1px solid;border-radius:4px;padding:2px 8px;font-size:14px;font-weight:500;line-height:18px;white-space:nowrap}
+.allow{color:var(--allow);background:var(--allow-bg);border-color:var(--allow-b)}.redact{color:var(--redact);background:var(--redact-bg);border-color:var(--redact-b)}
+.block{color:var(--block);background:var(--block-bg);border-color:var(--block-b)}.kill{color:var(--kill);background:var(--kill-bg);border-color:var(--kill-b)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;font-weight:500;color:var(--mute);font-size:13px;padding:10px 14px;border-bottom:1px solid var(--line-strong)}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.35}
+tr:last-child td{border-bottom:0}
+.rows .r{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);font-size:16px}
+.rows .r:first-child{border-top:0}
+.tiers .t{display:grid;grid-template-columns:90px 1fr 92px;gap:14px;align-items:baseline;padding:13px 18px;border-top:1px solid var(--line);font-size:16px}
+.tiers .t:first-child{border-top:0}.tiers .k{font-weight:600}.tiers .ms{font-family:var(--mono);font-size:14px;color:var(--mute);text-align:right}
+.inc{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.inc .card{padding:16px 18px}.inc .k{font-family:var(--mono);font-size:12px;color:var(--mute)}.inc h3{margin:6px 0 6px;font-size:18px;font-weight:600}.inc p{margin:0;font-size:15px;line-height:1.45;color:var(--mute)}
+.tg-canary .arm{transform-origin:40px 84px}.tg-canary .bird{transform-origin:31px 64px}.tg-canary .bar{transform:scaleX(0)}
+.tg-canary .e-happy,.tg-canary .e-x,.tg-canary .brow{opacity:0}
+</style></head><body><section class="s" style="grid-template-columns:1.15fr 1fr;column-gap:40px"><div class="top" style="grid-column:1/-1"><img src="../design/logo/logo.svg" alt="tollgate"><span>AI Control Layer</span></div>
+<h1 style="align-self:center;font-size:62px;line-height:1.04;letter-spacing:-.03em">One policy file between your agents <span class="m">and everything they can touch.</span></h1>
+<div style="align-self:center;justify-self:center;width:400px"><svg class="tg-canary is-idle" viewBox="-24 0 144 120" aria-label="Tollgate canary">
+ <g class="arm"><rect x="34" y="79" width="80" height="10" rx="5" fill="var(--ink)"/><g fill="#ffffff"><polygon points="58,79 64,79 60,89 54,89"/><polygon points="78,79 84,79 80,89 74,89"/><polygon points="98,79 104,79 100,89 94,89"/></g></g>
+ <rect x="24" y="63" width="14" height="51" rx="4" fill="var(--ink)"/>
+ <g class="bird">
+  <polygon points="17,52 8,47 9,57" fill="var(--canary-shade)"/>
+  <rect x="16" y="31" width="30" height="33" rx="10" fill="var(--canary)"/>
+  <path d="M16 44 H28 A5 5 0 0 1 28 54 H16 Z" fill="var(--canary-shade)"/>
+  <polygon points="46,41 53.5,44.5 46,48" fill="var(--canary-beak)"/>
+  <circle class="e-open" cx="38.5" cy="41" r="2.4" fill="var(--ink)"/>
+  <path class="e-happy" d="M35.9 42 q2.6 -3.4 5.2 0" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <g class="e-x" stroke="var(--ink)" stroke-width="1.7" stroke-linecap="round"><line x1="36.3" y1="38.8" x2="40.7" y2="43.2"/><line x1="40.7" y1="38.8" x2="36.3" y2="43.2"/></g>
+  <line class="brow" x1="34.5" y1="35.4" x2="42" y2="37.4" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>
+  <rect class="bar" x="29" y="37.5" width="17" height="7" fill="var(--ink)"/>
+ </g>
+</svg>
+</div>
+<div class="foot" style="grid-column:1/-1"><span>Danil Pankrashkin</span><span>HackYeah 2026 · Goldman Sachs track</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>The problem</span></div><div class="body "><div><h1>Agents read untrusted text. <span class="m">And they act on it.</span></h1>
+<p class="lead">AI agents now hold API keys, tools and customer data. Controls live inside each app or each model vendor, so a bank cannot define them once, enforce them everywhere and prove what happened.</p></div>
+<div class="inc">
+<div class="card"><div class="k">CVE-2025-32711 · 2025</div><h3>EchoLeak</h3><p>A hidden instruction in an email made Microsoft 365 Copilot put private data into an image link. Zero clicks.</p></div>
+<div class="card"><div class="k">CVE-2023-48022 · 2024</div><h3>ShadowRay</h3><p>Attackers ran code on AI clusters through Ray's unauthenticated Jobs API.</p></div>
+<div class="card"><div class="k">JFrog · 2024</div><h3>Malicious models</h3><p>Models on Hugging Face ran code when loaded, through pickle files.</p></div>
+</div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>2 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>What Tollgate is</span></div><div class="body two"><div><h1>One gateway. <span class="m">One policy file.</span></h1>
+<ul><li>An <b>OpenAI-compatible proxy</b>. Change two settings, base URL and API key; works with the official OpenAI SDK.</li>
+<li>Every request and response passes through it, including <b>tool definitions and tool calls</b>.</li>
+<li><code>policy.yaml</code> is the control catalog: controls, actions, thresholds, models, budgets, feed.</li>
+<li><b>Runs locally</b>: Ollama models, SQLite, hash-chained audit log, Next.js dashboard. No cloud APIs.</li></ul></div>
+<div class="shot"><img src="architecture.png" alt="Architecture"></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>3 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>How it decides</span></div><div class="body two-even"><div><h1>Rules first. <span class="m">Models only when unsure.</span></h1>
+<p class="lead">Deterministic checks decide most requests in about half a millisecond. A local model looks only at what the rules cannot decide, and a judge only when that model is unsure. Responses are scanned too.</p>
+<div class="metrics" style="margin-top:22px"><div class="met"><div class="l">Gateway overhead p50</div><div class="v">0.49 ms</div></div><div class="met"><div class="l">p95</div><div class="v">0.78 ms</div></div><div class="met"><div class="l">Throughput</div><div class="v">~1,700/s</div></div></div></div>
+<div class="card tiers">
+<div class="t"><span class="k">Tier 0</span><span>Keys, scopes, model allowlist, budgets, PII and secrets, Unicode and encoding tricks, attack signatures</span><span class="ms">0.48 ms</span></div>
+<div class="t"><span class="k">Tier 1</span><span>Llama Guard 3 (1B), local, hard timeout, fail-open or fail-closed</span><span class="ms">49 ms</span></div>
+<div class="t"><span class="k">Tier 2</span><span>Local judge (Llama 3.2 3B), only in the uncertain band</span><span class="ms">677 ms</span></div>
+<div class="t"><span class="k">Output</span><span>Redaction, canaries, link exfiltration, system-prompt leaks, tool-call gate</span><span class="ms">0.68 ms</span></div>
+</div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>4 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>Policy engine</span></div><div class="body two"><div><h1>Edit the file. <span class="m">The next request obeys it.</span></h1>
+<ul><li>Strict schema: a misspelt key or wrong value is <b>rejected with the exact path</b>; the last good policy stays active.</li>
+<li>Every decision records the <b>policy hash</b> it was made under.</li>
+<li><code>monitor</code> mode records "would block" and lets traffic pass; <code>enforce</code> acts.</li>
+<li>Presets: standard, <code>strict</code> (fail-closed), <code>monitor</code>.</li></ul></div>
+<div class="shot"><img src="screenshots/policy.png" alt="Policy page"></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>5 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>Budgets</span></div><div class="body two"><div><h1>Budgets per agent, <span class="m">checked before spending.</span></h1>
+<ul><li>Tokens per hour, <b>USD per day</b> (priced per model, local models at $0), compute seconds, requests per minute, tool depth.</li>
+<li>Estimated before the call, reconciled after. Over budget: <code>429</code> with the rule id.</li>
+<li><b>Loop breaker</b>: the same request 5 times in 30 s is blocked. Circuit breaker for a failing upstream.</li></ul></div>
+<div class="shot"><img src="screenshots/overview.png" alt="Overview"></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>6 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>Historical attack feed</span></div><div class="body "><div><h1>Signatures from real incidents, <span class="m">from an external feed.</span></h1>
+<p class="lead"><code>feeds/ai-exploits.json</code> is hot-reloaded from a file or URL. 14 entries ship; a security team adds new ones without touching the gateway.</p></div>
+<div class="card"><table><thead><tr><th>Incident</th><th>What Tollgate checks</th></tr></thead><tbody>
+<tr><td>Malicious Hugging Face pickles (JFrog, 2024)</td><td>Pickle opcodes that import <code>os</code>, <code>subprocess</code>, <code>exec</code></td></tr>
+<tr><td>nullifAI (ReversingLabs, 2025)</td><td>Broken or truncated model archives are blocked</td></tr>
+<tr><td>ShadowRay, CVE-2023-48022</td><td>Tool calls to the Ray Jobs API (port 8265)</td></tr>
+<tr><td>Probllama, CVE-2024-37032</td><td>Malformed model digests; Ollama older than 0.1.34 flagged</td></tr>
+<tr><td>EchoLeak, CVE-2025-32711</td><td>Images and links to non-allowlisted hosts carrying data</td></tr>
+<tr><td>MCP tool poisoning, CVE-2025-54136</td><td>Hidden instructions in tool descriptions</td></tr>
+</tbody></table></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>7 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>Reporting and audit</span></div><div class="body two"><div><h1>For managers <span class="m">and for the security team.</span></h1>
+<ul><li><b>Overview</b>: posture score, blocks over time, spend per agent, latency per stage.</li>
+<li><b>Security</b>: every decision with rule, tier, OWASP id and redacted excerpt; filters; JSONL and CSV export.</li>
+<li><b>Audit log</b>: each line holds the hash of the previous one; <code>audit:verify</code> finds the first tampered line.</li></ul></div>
+<div class="shot"><img src="screenshots/security.png" alt="Security events"></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>8 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>Self-testing</span></div><div class="body two"><div><h1>A test suite <span class="m">that attacks itself.</span></h1>
+<ul><li><code>bun test</code>: <b>565 pass, 0 fail</b> (2 model-backed skips). Positive and negative cases for every control.</li>
+<li><b>Red Team Loop</b>: 88 seed attacks × 13 mutations against the live policy. Every bypass becomes a new test.</li>
+<li>Bypass rate, depth 1: <b>22.7 % → 13.3 %</b> during the hackathon. Depth 2: 12.1 % before the last fixes.</li>
+<li>318 open bypasses are published with a reason, not hidden.</li></ul></div>
+<div class="shot"><img src="screenshots/redteam.png" alt="Red team"></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>9 / 10</span></div></section><section class="s"><div class="top"><img src="../design/logo/logo.svg" alt="tollgate"><span>Limits and next steps</span></div><div class="body two-even"><div><h1>What it does not do yet.</h1>
+<ul><li>Semantic checks are bounded by small local models; bypass rates are published.</li>
+<li>Streaming is buffered: the full answer is scanned before it is sent.</li>
+<li>Single node with SQLite; the audit chain is tamper-evident, not tamper-proof.</li>
+<li>Not covered: OWASP LLM08, LLM09, ASI09.</li></ul></div>
+<div><h1 class="m" style="color:var(--mute)">Next</h1>
+<ul><li>MCP transport proxy with tool-manifest pinning.</li><li>Model-file scanning.</li><li>Shared budget counters for many instances.</li></ul>
+<div class="card" style="margin-top:22px;padding:14px 18px;font-family:var(--mono);font-size:15px;line-height:1.7">./scripts/setup.sh<br>bun run dev<br>bun test</div></div></div><div class="foot"><span>HackYeah 2026 · Goldman Sachs AI Control Layer</span><span>10 / 10</span></div></section>
+<script>
+const bad=[];document.querySelectorAll('.s').forEach((s,i)=>{const r=s.getBoundingClientRect();s.querySelectorAll('*').forEach(e=>{const b=e.getBoundingClientRect();if(b.width&&(b.right>r.right+1||b.bottom>r.bottom+1))bad.push((i+1)+':'+e.tagName+'.'+e.className)});
+s.querySelectorAll('.body, .body > *, li, td, h1, p').forEach(e=>{if(e.scrollHeight>e.clientHeight+2&&getComputedStyle(e).overflow!=='visible')bad.push((i+1)+':overflow '+e.className)})});
+document.title='CHECK:'+JSON.stringify(bad.slice(0,30));
+</script></body></html>

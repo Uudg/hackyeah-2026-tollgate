@@ -405,7 +405,7 @@ The API key identifies the agent (`agents.<id>.key` in `policy.yaml`) and select
 
 **Referenced but not used in the critical path:** Presidio (MIT), ModelScan (Apache 2.0), Prompt Guard 2 (Llama licence), LlamaFirewall paper (Meta). LLM Guard (archived July 2026) and LiteLLM enterprise features were deliberately not used; the pipeline and budget engine are written from scratch in TypeScript.
 
-**Docs tooling (run once, not dependencies):** Marp CLI (MIT) rendered `docs/slides.pdf` from `docs/SLIDES.md`; mermaid-cli (MIT) rendered `docs/architecture.png` from `docs/architecture.mmd`.
+**Docs tooling (run once, not dependencies):** `docs/slides.pdf` is printed from `docs/slides.html` with headless Chrome (`docs/SLIDES.md` is the earlier Marp text version, rendered with Marp CLI, MIT); mermaid-cli (MIT) rendered `docs/architecture.png` from `docs/architecture.mmd`.
 
 **npm dependencies:**
 
