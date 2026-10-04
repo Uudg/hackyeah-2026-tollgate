@@ -109,10 +109,10 @@ Plus generic patterns: reverse shell, `curl | sh`, SSRF to cloud metadata, jailb
 
 # Test suite and the Red Team Loop
 
-- `bun test`: 503 pass, 2 skip (model-backed), 0 fail in about 35 s. YAML fixtures per control, each tagged with control id and OWASP ids, with a positive and a negative case. Also hot-reload, invalid-policy, audit-tamper and latency tests.
+- `bun test`: 561 pass, 2 skip (model-backed), 0 fail in about 52 s. YAML fixtures per control, each tagged with control id and OWASP ids, with a positive and a negative case. Also hot-reload, invalid-policy, audit-tamper and latency tests.
 - Red Team Loop: 88 seed attacks (own, plus garak and promptfoo with attribution) times 13 mutators (base64, hex, URL, leetspeak, homoglyphs, zero-width, role-play, payload split, multi-turn, ...) against the live policy.
 - Every bypass becomes a failing fixture in `tests/cases/generated/`.
-- Depth 1, 1204 attempts: bypass rate **22.7 % on the first run, 15.7 % after the M7 fixes, 13.3 % after the hardening pass**. 83 former bypasses are now regression tests; 160 are still open, listed with a reason, and kept out of the pass count.
+- Bypass rate, depth 1 (1204 attempts): **22.7 % → 15.7 % → 13.3 %** (first run, M7 fixes, hardening). Depth 2 (12,922 attempts): **12.1 % → ≤ 10.6 %**. 125 fixed bypasses are regression tests; 318 open ones are listed with a reason.
 
 ![bg right:42% fit](screenshots/redteam.png)
 
@@ -128,9 +128,9 @@ Plus generic patterns: reverse shell, `curl | sh`, SSRF to cloud metadata, jailb
 | tier 0 | 0.48 ms | 2.1 ms |
 | tier 1 (`llama-guard3:1b`) | 49 ms | 138 ms |
 | tier 2 judge (`llama3.2:3b`) | 677 ms | 970 ms |
-| gateway overhead, tier 0 only | 0.30 ms | 0.40 ms |
+| gateway overhead, tier 0 only | 0.49 ms | 0.78 ms |
 
-- Throughput on the tier-0 path: ~2,500 req/s (1 client), ~3,400 req/s (32 clients), 0 errors (`bun run bench`).
+- Throughput on the tier-0 path: ~1,700 req/s (1 client), ~2,050 req/s (32 clients), 0 errors (`bun run bench`).
 
 ![bg right:40% fit](screenshots/playground.png)
 

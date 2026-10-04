@@ -183,3 +183,59 @@ Backlog: 33 of the 183 open cases now pass (`01M41R2A…-fixed.yaml`); the open 
 - `kill_session` is per (agent, session id): a new session id escapes it. Documented in README limitations instead of a new policy key.
 - A single combining mark (x̄, IPA) no longer counts toward `unicode.max_invisible`; stacked marks (Zalgo) still do.
 - Test policy only: semantic timeouts 10 s / 20 s, so a busy judge machine does not fail open and turn model-backed cases red. The shipped policy keeps 1.5 s / 6 s.
+
+## Red team depth 2 — overnight item 7 (Sun 4 Oct, ~03:00–04:30 CEST)
+
+### Run
+Run `01M424QPAHMNZDGEY42E37HAXB`: shipped `policy.yaml`, 88 seeds × every ordered mutator pair, rng_seed 1, Llama Guard 1B + llama3.2:3b judge, 4 workers, 63 min. 12 922 attempts, 1 569 bypasses, **12.1 %**.
+
+| control | attempts | bypasses | rate | caught after D28 |
+|---|---:|---:|---:|---:|
+| prompt_injection | 3952 | 501 | 12.7 % | 25 |
+| signatures | 2888 | 334 | 11.6 % | 17 |
+| tool_calls | 1368 | 309 | 22.6 % | 1 |
+| content_safety | 1368 | 185 | 13.5 % | 5 |
+| sysprompt | 556 | 104 | 18.7 % | 67 |
+| link_exfil | 410 | 69 | 16.8 % | 51 |
+| pii | 1633 | 36 | 2.2 % | 20 |
+| secrets | 747 | 31 | 4.2 % | 7 |
+| **total** | **12 922** | **1 569** | **12.1 %** | **193 → ≤ 10.6 %** |
+
+"Caught after" = the 1 569 bypassing inputs replayed through the fixed code with tier 0 and the output path only (no models), so 10.6 % is an upper bound, not a fresh 1-hour run.
+
+### Triage
+- 383 bypasses were Ollama timeouts under 4 workers (`semantic.unavailable` / `semantic.judge_unavailable`, fail-open). Not misses; `policy.strict.yaml` fails closed.
+- Fixed (D28, `f7971ce`): decoded text is normalized (zero-width, homoglyphs); leetspeak / fragment / whole-text URL rewrites also run on decoded text and on each other; lone `4`/`1` and short words like `d0` fold; `@` stays an e-mail; output links read after homoglyph folding (`httрs://`); exfil links in joined fragments; leetspeak e-mail in output; card number right after another number.
+- Open (164-case sample in `01M424QP…-open.yaml`): request-side tool intents 67, paraphrase-level jailbreaks 64, Ollama timeouts 27, value-changing character obfuscation 5, encoded value corrupted by the second mutator 1.
+- Tests: `tests/cases/redteam-depth2.yaml` (16, of which 4 allow), 36 depth-2 cases fixed and kept as regression tests, 6 depth-1 backlog cases unskipped. Backlog now 318 (154 + 164).
+
+### Decisions made without asking
+- The leetspeak PII scan on output redacts the whole response when it finds a value the literal scan did not (the variant's span is the whole text). Safer than leaking; costs a full redaction on that rare reply.
+- Output links are now always read from the homoglyph-folded text; a host whose characters changed in the fold is untrusted. A legitimate URL with Cyrillic in the host is treated as untrusted.
+
+## Morning report
+
+**Done overnight** (all committed, nothing pushed)
+- Hardening pass (`a6e9d04`) + review fixes; M9 assets (`3a2db7e`, by the Cowork session); fresh-clone fix, tag `m9` (`69cc388`).
+- Dashboard brand task: logo, favicon, canary (`7d1ba95`, `b953505`).
+- Red team depth 2 (1 h run) triaged and fixed (`f7971ce`, `853e57a`); see the section above.
+- Item 8: full `bun test` with models on a fresh clone, `bun run bench`, README and slide numbers updated, `docs/slides.pdf` re-rendered.
+
+**Numbers**
+- Tests (fresh clone, `bun install --frozen-lockfile`, Ollama up): `bun run check` clean; `bun test` 561 pass, 2 skip (granite not pulled), 0 fail; fixtures 412 pass; 318 open bypasses listed, not counted.
+- Red team: depth 1 22.7 % → 15.7 % → 13.3 %; depth 2 12.1 % → ≤ 10.6 % (deterministic replay); 383 of the depth-2 bypasses were Ollama timeouts failing open.
+- Latency (`bun run bench`): tier 0 p50 0.12 / p95 0.17 ms; gateway overhead p50 0.49 / p95 0.78 ms; ~1,700 req/s (1 client), ~2,050 (32). Tier 1 p50 73 / p95 102 ms. Overhead is ~0.2 ms higher than before the hardening pass (more decode-and-rescan).
+
+**Broken or risky**
+- 3 untracked `tests/cases/generated/01M425*.yaml` (from red-team runs on the live gateway, ~03:30) fail `bun test` locally (112–127 fails). Not in git, so a judge's clone is clean.
+- Playground shows "undefined" and "6.32s ms" when Ollama is slow (display bug, dashboard not touched overnight).
+- `kill_session` is per session id: a new id escapes it (README limitations).
+- With no `max_tokens`, `default_max_tokens` (1024) is sent upstream as the cap.
+- Depth-2 "after" number is a replay estimate, not a fresh 1-hour run.
+- Nothing is running on 8787/3000. The video session (hackyeah2026-4e) recorded on `853e57a` and is rendering in `~/Documents/tollgate-promo`.
+
+**Decisions for you**
+1. Commit or delete the 3 untracked generated files.
+2. README disclosure: `TODO(Dan)` about which model wrote the planning documents.
+3. Push, then submit on HackTribe (title, team, description, slides PDF, repo link).
+4. Demo with `policy.yaml` (fail open) or `policy.strict.yaml` (fail closed, slower when Ollama is busy)?

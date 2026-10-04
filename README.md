@@ -208,23 +208,23 @@ audit                  6     0     0   ASI03, LLM02, LLM05, LLM10
 auth                   9     0     0   ASI03, LLM06
 budget                19     0     0   ASI07, ASI08, LLM06, LLM10
 canaries              16     0     0   ASI02, ASI03, ASI06, LLM02, LLM07
-content_safety        15     0     0   LLM01
+content_safety        24     0     0   LLM01
 decode                20     0     0   ASI01, LLM01, LLM02
-link_exfil            15     0     0   ASI01, ASI02, LLM02, LLM05
+link_exfil            29     0     0   ASI01, ASI02, LLM02, LLM05
 models                 9     0     0   ASI03, ASI04, LLM03
-pii                   31     0     0   LLM02, LLM05
+pii                   41     0     0   LLM02, LLM05
 policy                12     0     0   ASI03, ASI06, LLM01, LLM02, LLM03, LLM10
-prompt_injection      92     0     1   ASI01, ASI06, LLM01, LLM07     (1 skipped: model-backed)
+prompt_injection     101     0     1   ASI01, ASI06, LLM01, LLM07     (1 skipped: model-backed)
 secrets               25     0     0   ASI02, LLM01, LLM02
-signatures            38     0     0   ASI01..ASI05, LLM01..LLM05, LLM07
-sysprompt             15     0     0   ASI02, LLM02, LLM07
+signatures            42     0     0   ASI01, ASI02, ASI03, ASI04, ASI05, LLM01, LLM02, LLM03, LLM04, LLM05, LLM07
+sysprompt             27     0     0   ASI02, LLM01, LLM02, LLM07
 tool_calls            21     0     0   ASI02, ASI05, ASI08, LLM02, LLM05, LLM06
 unicode               11     0     0   LLM01, LLM02
-TOTAL  354 pass · 0 fail · 1 skip   in 29.0 s
-known open bypasses (red-team backlog): 160   not run, not counted above; tests/cases/generated/*-open.yaml, run them with TOLLGATE_BACKLOG=1 bun test
+TOTAL  412 pass · 0 fail · 1 skip   in 46.1 s
+known open bypasses (red-team backlog): 318   not run, not counted above; tests/cases/generated/*-open.yaml, run them with TOLLGATE_BACKLOG=1 bun test
 ```
 
-Whole `bun test`: 503 pass, 2 skip, 0 fail in ~35 s with Ollama up (fixtures plus the suites below and the controls unit tests). The 160 open red-team cases are reported on their own line and not counted.
+Whole `bun test` on a fresh clone: 561 pass, 2 skip, 0 fail in ~52 s with Ollama up (fixtures plus the suites below and the controls unit tests). The 318 open red-team cases are reported on their own line and not counted.
 
 Also included: a hot-reload test (edits a temp policy and the feed, asserts the next request uses them), a policy-schema test (the three presets validate, misspelt keys are rejected), a mock-semantic test (tiers 1–2 and fail-open/closed without a model), an audit-chain tamper test, an admin-API shape test, and a latency test (tier-0 overhead vs calling the upstream directly).
 
@@ -311,9 +311,9 @@ Per-stage timers (auth, budget, tier 0, tier 1, tier 2, upstream, output) with p
 | tier 1 (llama-guard3:1b) | 49 ms | 138 ms | Ollama, model resident (`keep_alive: 30m`) |
 | tier 2 (llama3.2:3b judge) | 677 ms | 970 ms | only for uncertain scores and flagged content-safety categories |
 | output scan | 0.68 ms | 1.5 ms | |
-| gateway overhead vs direct call, tier 0 only | 0.30 ms | 0.40 ms | `bun run bench`, 1000 sequential requests |
+| gateway overhead vs direct call, tier 0 only | 0.49 ms | 0.78 ms | `bun run bench`, 1000 sequential requests |
 
-`bun run bench` on the M1 Max (echo upstream, semantic tiers off): tier-0 stage p95 0.07 ms; throughput ~2,500 req/s with one client and ~3,400 req/s with 32 concurrent clients, 0 errors. The model tiers dominate when they run: a clean request adds ~50 ms (tier 1); a flagged one adds ~0.7 s (judge).
+`bun run bench` on the M1 Max (echo upstream, semantic tiers off, after the depth-2 fixes): tier-0 stage p50 0.12 ms, p95 0.17 ms; throughput ~1,700 req/s with one client and ~2,050 req/s with 32 concurrent clients, 0 errors. (Before the hardening pass and the depth-2 decoders it was ~2,500 / ~3,400 req/s: the extra decode-and-rescan work costs about 0.2 ms per request.) The model tiers dominate when they run: a clean request adds ~50 ms (tier 1); a flagged one adds ~0.7 s (judge).
 
 ---
 
