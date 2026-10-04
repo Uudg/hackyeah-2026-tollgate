@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { CanaryHead, useCanaryReaction } from "./Canary";
+import { Guide, useGuide } from "./Guide";
 import { LiveProvider, useLive } from "./Live";
 import { ScrollX, cn } from "./ui";
 
@@ -95,7 +96,9 @@ function TopBar() {
   const path = usePathname();
   const { pendingApprovals } = useLive();
   const active = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
+  const guide = useGuide();
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-line-strong bg-panel">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-0 px-4 py-1.5 max-md:pb-0">
         <Logo />
@@ -103,7 +106,7 @@ function TopBar() {
         <ScrollX>
         <nav className="flex gap-0.5 px-3 md:px-0" aria-label="Primary">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} aria-current={active(n.href) ? "page" : undefined}
+            <Link key={n.href} href={n.href} data-guide={n.href} aria-current={active(n.href) ? "page" : undefined}
               className={cn("inline-flex shrink-0 items-center rounded px-2.5 py-1 text-[12px] max-md:min-h-10 max-md:px-3.5 max-md:text-[13px]", active(n.href) ? "bg-accent-soft font-medium text-accent" : "text-mute hover:bg-[#f0f1f3] hover:text-ink")}>
               {n.label}
               {n.href === "/approvals" && pendingApprovals > 0 && (
@@ -114,9 +117,17 @@ function TopBar() {
         </nav>
         </ScrollX>
         </div>
-        <div className="ml-auto flex items-center gap-2"><PolicyBadge /><ConnBadge /></div>
+        <div className="ml-auto flex items-center gap-2">
+          <PolicyBadge /><ConnBadge />
+          <button type="button" data-guide="guide" onClick={guide.open} aria-label="Open the guide" title="Open the guide"
+            className="relative inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded border border-line-strong bg-panel px-2 text-[11px] leading-none text-ink before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:bg-[#f0f1f3] md:before:hidden">
+            <span className="sm:hidden">?</span><span className="max-sm:hidden">Guide</span>
+          </button>
+        </div>
       </div>
     </header>
+    <Guide step={guide.step} setStep={guide.setStep} close={guide.close} />
+    </>
   );
 }
 

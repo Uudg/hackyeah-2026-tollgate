@@ -295,6 +295,8 @@ Committed results in `tests/cases/generated/`: three `*-fixed.yaml` files (50 + 
 - **Approvals:** pending tool calls with Approve/Deny and a countdown.
 - **Playground:** send a prompt through the gateway as any agent, with or without tools and a planted canary, and watch each stage's verdict and latency.
 
+A short guide opens on the first visit and walks through the header links one by one; the **Guide** button in the header runs it again.
+
 ---
 
 ## Telemetry
