@@ -28,6 +28,8 @@ bun-debug.log*
 
 # test and red-team scratch (generated cases under tests/cases/generated/ are committed deliberately)
 coverage/
+# the dashboard's /coverage route is source, not test coverage output
+!apps/dashboard/app/coverage/
 .redteam-tmp/
 tests/.last-report.json
 
