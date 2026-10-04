@@ -222,20 +222,18 @@ Run `01M424QPAHMNZDGEY42E37HAXB`: shipped `policy.yaml`, 88 seeds × every order
 - Item 8: full `bun test` with models on a fresh clone, `bun run bench`, README and slide numbers updated, `docs/slides.pdf` re-rendered.
 
 **Numbers**
-- Tests (fresh clone, `bun install --frozen-lockfile`, Ollama up): `bun run check` clean; `bun test` 561 pass, 2 skip (granite not pulled), 0 fail; fixtures 412 pass; 318 open bypasses listed, not counted.
+- Tests (fresh clone, `bun install --frozen-lockfile`, Ollama up): `bun run check` clean; `bun test` 565 pass, 2 skip (granite not pulled), 0 fail (561 at night + 4 dashboard tests in the morning); fixtures 412 pass; 318 open bypasses listed, not counted.
 - Red team: depth 1 22.7 % → 15.7 % → 13.3 %; depth 2 12.1 % → ≤ 10.6 % (deterministic replay); 383 of the depth-2 bypasses were Ollama timeouts failing open.
 - Latency (`bun run bench`): tier 0 p50 0.12 / p95 0.17 ms; gateway overhead p50 0.49 / p95 0.78 ms; ~1,700 req/s (1 client), ~2,050 (32). Tier 1 p50 73 / p95 102 ms. Overhead is ~0.2 ms higher than before the hardening pass (more decode-and-rescan).
 
 **Broken or risky**
-- 3 untracked `tests/cases/generated/01M425*.yaml` (from red-team runs on the live gateway, ~03:30) fail `bun test` locally (112–127 fails). Not in git, so a judge's clone is clean.
-- Playground shows "undefined" and "6.32s ms" when Ollama is slow (display bug, dashboard not touched overnight).
+- Fixed in the morning: the 3 untracked `01M425*.yaml` cases moved to `_to_delete/generated/` (local `bun test` 0 fail); the playground's "undefined" / "6.32s ms" now reads "timed out" / "6.3 s" (`StageStrip.test.ts`).
 - `kill_session` is per session id: a new id escapes it (README limitations).
 - With no `max_tokens`, `default_max_tokens` (1024) is sent upstream as the cap.
 - Depth-2 "after" number is a replay estimate, not a fresh 1-hour run.
 - Nothing is running on 8787/3000. The video session (hackyeah2026-4e) recorded on `853e57a` and is rendering in `~/Documents/tollgate-promo`.
 
 **Decisions for you**
-1. Commit or delete the 3 untracked generated files.
-2. README disclosure: `TODO(Dan)` about which model wrote the planning documents.
-3. Push, then submit on HackTribe (title, team, description, slides PDF, repo link).
-4. Demo with `policy.yaml` (fail open) or `policy.strict.yaml` (fail closed, slower when Ollama is busy)?
+1. ~~Untracked generated files~~ moved aside; ~~disclosure TODO~~ filled in (morning).
+2. Push, then submit on HackTribe (title, team, description, slides PDF, repo link).
+3. Demo with `policy.yaml` (fail open) or `policy.strict.yaml` (fail closed, slower when Ollama is busy)?

@@ -1,6 +1,6 @@
 "use client";
 // Hand-written SVG charts. No chart library. Colour is used only for decision series; everything else is grey or the accent.
-import { fmtMs } from "@/lib/format";
+import { fmtMs, fmtMsUnit } from "@/lib/format";
 import type { StageLatency } from "@tollgate/policy";
 
 export const DECISION_FILL = { allow: "#1d7a48", redact: "#c08a14", block: "#b3261e", kill_session: "#6a3fa3" } as const;
@@ -114,7 +114,7 @@ export function StageBar({ latency }: { latency: StageLatency }) {
         <rect x={0} y={0} width={W} height={16} fill="#eceef1" rx={2} />
         {stages.map((s) => {
           const w = (latency[s] / total) * W;
-          const el = w > 0 ? <rect key={s} x={x} y={0} width={Math.max(1.5, w)} height={16} fill={STAGE_FILL[s]}><title>{`${s}: ${fmtMs(latency[s])} ms`}</title></rect> : null;
+          const el = w > 0 ? <rect key={s} x={x} y={0} width={Math.max(1.5, w)} height={16} fill={STAGE_FILL[s]}><title>{`${s}: ${fmtMsUnit(latency[s])}`}</title></rect> : null;
           x += w;
           return el;
         })}
@@ -126,7 +126,7 @@ export function StageBar({ latency }: { latency: StageLatency }) {
             {s} {fmtMs(latency[s])}
           </span>
         ))}
-        <span className="font-medium">total {fmtMs(latency.total)} ms</span>
+        <span className="font-medium">total {fmtMsUnit(latency.total)}</span>
       </div>
     </div>
   );

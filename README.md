@@ -224,7 +224,7 @@ TOTAL  412 pass · 0 fail · 1 skip   in 46.1 s
 known open bypasses (red-team backlog): 318   not run, not counted above; tests/cases/generated/*-open.yaml, run them with TOLLGATE_BACKLOG=1 bun test
 ```
 
-Whole `bun test` on a fresh clone: 561 pass, 2 skip, 0 fail in ~52 s with Ollama up (fixtures plus the suites below and the controls unit tests). The 318 open red-team cases are reported on their own line and not counted.
+Whole `bun test` on a fresh clone: 565 pass, 2 skip, 0 fail in ~52 s with Ollama up (fixtures plus the suites below and the controls unit tests). The 318 open red-team cases are reported on their own line and not counted.
 
 Also included: a hot-reload test (edits a temp policy and the feed, asserts the next request uses them), a policy-schema test (the three presets validate, misspelt keys are rejected), a mock-semantic test (tiers 1–2 and fail-open/closed without a model), an audit-chain tamper test, an admin-API shape test, and a latency test (tier-0 overhead vs calling the upstream directly).
 

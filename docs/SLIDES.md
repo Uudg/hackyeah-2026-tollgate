@@ -109,7 +109,7 @@ Plus generic patterns: reverse shell, `curl | sh`, SSRF to cloud metadata, jailb
 
 # Test suite and the Red Team Loop
 
-- `bun test`: 561 pass, 2 skip (model-backed), 0 fail in about 52 s. YAML fixtures per control, each tagged with control id and OWASP ids, with a positive and a negative case. Also hot-reload, invalid-policy, audit-tamper and latency tests.
+- `bun test`: 565 pass, 2 skip (model-backed), 0 fail in about 52 s. YAML fixtures per control, each tagged with control id and OWASP ids, with a positive and a negative case. Also hot-reload, invalid-policy, audit-tamper and latency tests.
 - Red Team Loop: 88 seed attacks (own, plus garak and promptfoo with attribution) times 13 mutators (base64, hex, URL, leetspeak, homoglyphs, zero-width, role-play, payload split, multi-turn, ...) against the live policy.
 - Every bypass becomes a failing fixture in `tests/cases/generated/`.
 - Bypass rate, depth 1 (1204 attempts): **22.7 % → 15.7 % → 13.3 %** (first run, M7 fixes, hardening). Depth 2 (12,922 attempts): **12.1 % → ≤ 10.6 %**. 125 fixed bypasses are regression tests; 318 open ones are listed with a reason.

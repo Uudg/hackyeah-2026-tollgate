@@ -9,10 +9,10 @@ export function fmtMs(n: number | null | undefined): string {
   return `${(n / 1000).toFixed(2)}s`;
 }
 
-/** fmtMs with its unit attached ("92 ms", "1.59 s"). */
+/** fmtMs with its unit attached ("92 ms", "6.3 s"). Use this wherever a unit is shown; never append " ms" to fmtMs. */
 export function fmtMsUnit(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "-";
-  return n >= 1000 ? `${(n / 1000).toFixed(2)} s` : `${fmtMs(n)} ms`;
+  return n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${fmtMs(n)} ms`;
 }
 
 export function fmtUsd(n: number): string {

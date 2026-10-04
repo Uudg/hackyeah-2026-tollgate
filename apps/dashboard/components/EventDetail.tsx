@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { DecisionRecord } from "@tollgate/policy";
 import { api } from "@/lib/gateway";
 import { useAsync } from "@/lib/hooks";
-import { downloadText, fmtDateTime, fmtMs, pretty } from "@/lib/format";
+import { downloadText, fmtDateTime, fmtMsUnit, pretty } from "@/lib/format";
 import { Chip, DecisionBadge, ErrorNote, JsonBlock, KV, Loading, PageHeader, Panel } from "./ui";
 import { StageBar } from "./charts";
 import { StageStrip } from "./StageStrip";
@@ -102,7 +102,7 @@ export default function EventDetail({ id }: { id: string }) {
                 <KV k="Tokens">{r.tokensIn} in / {r.tokensOut} out</KV>
                 <KV k="Cost">${r.costUsd.toFixed(6)}</KV>
                 <KV k="Compute">{r.computeSeconds.toFixed(3)} s</KV>
-                <KV k="Total latency">{fmtMs(r.latencyMs.total)} ms</KV>
+                <KV k="Total latency">{fmtMsUnit(r.latencyMs.total)}</KV>
               </dl>
             </Panel>
             <Panel title="Policy and feed">

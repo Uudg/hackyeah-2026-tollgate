@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/gateway";
 import type { ChatMessage, PlaygroundResult } from "@/lib/contract";
-import { errMsg, fmtMs } from "@/lib/format";
+import { errMsg, fmtMsUnit } from "@/lib/format";
 import { Canary, useCanaryReaction } from "./Canary";
 import { useLive } from "./Live";
 import { DecisionBadge, Chip, ErrorNote, PageHeader, Panel, Toggle, cn } from "./ui";
@@ -159,7 +159,7 @@ export default function Playground() {
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
                         <DecisionBadge decision={t.result.record.decision} enforced={t.result.record.enforced} />
                         <span className="mono">{t.result.record.ruleId ?? "no rule"}</span>
-                        <span className="text-mute">tier {t.result.record.tier ?? "-"} · HTTP {t.result.status} · {fmtMs(t.result.record.latencyMs.total)} ms</span>
+                        <span className="text-mute">tier {t.result.record.tier ?? "-"} · HTTP {t.result.status} · {fmtMsUnit(t.result.record.latencyMs.total)}</span>
                         {t.result.record.owasp.map((o) => <Chip key={o}>{o}</Chip>)}
                         <Link className="ml-auto text-accent underline" href={`/security/events/${t.result.record.id}`}>event</Link>
                       </div>
